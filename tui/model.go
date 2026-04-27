@@ -65,6 +65,10 @@ type sessionCreatedMsg struct {
 	err       error
 }
 
+type sessionLoadedMsg struct {
+	err error
+}
+
 type Model struct {
 	width  int
 	height int
@@ -113,6 +117,7 @@ type Model struct {
 	errMsg      string
 	statusText  string
 	lastKeyTime time.Time
+	lastEscTime time.Time
 }
 
 func NewModel(debug bool, logger *slog.Logger) Model {
@@ -232,6 +237,7 @@ func (m *Model) addMessage(msg component.ChatMessage) {
 
 func (m *Model) submitPrompt(text string) tea.Cmd {
 	m.addMessage(component.ChatMessage{Role: component.RoleUser, Content: text})
+	m.updateChatViewport()
 
 	sessionID := m.activeSessionID
 	ctx, cancel := context.WithCancel(m.ctx)
@@ -270,6 +276,21 @@ func (m *Model) createSession() tea.Cmd {
 			return sessionCreatedMsg{err: err}
 		}
 		return sessionCreatedMsg{sessionID: string(newSess.SessionId)}
+	}
+}
+
+func (m *Model) loadSession(sessionID string) tea.Cmd {
+	m.messages = nil
+	m.todoList.Items = nil
+	m.loading = true
+	m.statusText = "Loading session..."
+	return func() tea.Msg {
+		_, err := m.conn.LoadSession(m.ctx, acp.LoadSessionRequest{
+			SessionId: acp.SessionId(sessionID),
+			Cwd:       client.MustCwd(),
+			McpServers: []acp.McpServer{},
+		})
+		return sessionLoadedMsg{err: err}
 	}
 }
 

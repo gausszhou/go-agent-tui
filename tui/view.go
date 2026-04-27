@@ -3,8 +3,8 @@ package tui
 import (
 	"strings"
 
-	overlay "github.com/rmhubbert/bubbletea-overlay"
 	"github.com/charmbracelet/lipgloss"
+	overlay "github.com/rmhubbert/bubbletea-overlay"
 )
 
 func (m Model) View() string {
@@ -62,7 +62,7 @@ func (m Model) renderLeft(width, chatH int) string {
 	m.statusBar.Width = width
 	m.statusBar.Loading = m.loading
 	m.statusBar.Status = m.statusText
-	m.statusBar.Help = "Enter Send  Ctrl+P Commands  Ctrl+I Stop  Ctrl+H Help  Ctrl+C Quit"
+	m.statusBar.Help = "Enter Send  Esc Esc Interrupt  Ctrl+P Commands  Ctrl+C Quit"
 	m.statusBar.Style = statusBarBg()
 	status := m.statusBar.View()
 

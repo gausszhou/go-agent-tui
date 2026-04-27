@@ -78,6 +78,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case acpEventMsg:
 		switch msg.event.Kind {
+		case client.AcpUserChunk:
+			m.addMessage(component.ChatMessage{Role: component.RoleUser, Content: msg.event.Text})
+			m.updateChatViewport()
 		case client.AcpAgentChunk:
 			m.appendAgentText(msg.event.Text)
 			m.updateChatViewport()
@@ -172,6 +175,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.messages = nil
 		m.todoList.Items = nil
 		m.statusText = "New session created"
+		return m, nil
+
+	case sessionLoadedMsg:
+		m.loading = false
+		if msg.err != nil {
+			m.statusText = "Load error: " + msg.err.Error()
+			m.errMsg = msg.err.Error()
+			return m, nil
+		}
+		m.statusText = "Session loaded"
 		return m, nil
 
 	case tea.KeyMsg:
@@ -284,13 +297,11 @@ func (m Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			m.messages = nil
-			m.todoList.Items = nil
-			m.statusText = "Switched to " + sess.Name
+			m.statusText = "Loading " + sess.Name + "..."
 		}
 		m.focus = FocusInput
 		m.showSessionList = false
-		return m, nil
+		return m, tea.Batch(m.loadSession(m.activeSessionID), m.waitForEvents(), spinnerTick())
 
 	case "esc", "ctrl+s":
 		m.showSessionList = false
@@ -382,12 +393,23 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "ctrl+i":
-		m.interruptPrompt()
-		return m, nil
-
-	case "ctrl+h":
-		m.showHelp = !m.showHelp
+	case "esc":
+		if m.promptRunning {
+			now := time.Now()
+			if !m.lastEscTime.IsZero() && now.Sub(m.lastEscTime) < 500*time.Millisecond {
+				m.interruptPrompt()
+				m.lastEscTime = time.Time{}
+				return m, nil
+			}
+			m.lastEscTime = now
+			m.statusText = "Press Esc again to interrupt"
+			return m, nil
+		}
+		m.lastEscTime = time.Time{}
+		if m.textarea.Value() != "" {
+			m.textarea.Reset()
+			return m, nil
+		}
 		return m, nil
 
 	case "ctrl+c":

@@ -10,7 +10,7 @@ import (
 type MessageRole int
 
 const (
-	RoleUser   MessageRole = iota
+	RoleUser MessageRole = iota
 	RoleAgent
 	RoleSystem
 	RoleTool

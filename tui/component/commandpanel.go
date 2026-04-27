@@ -42,10 +42,10 @@ func DefaultCommands() CommandPanel {
 	return NewCommandPanel([]Command{
 		{Key: "Enter", Desc: "Send"},
 		{Key: "Shift+Enter", Desc: "Newline"},
-		{Key: "Ctrl+N", Desc: "New Session"},
+		{Key: "Esc Esc", Desc: "Interrupt"},
+		{Key: "Ctrl+P", Desc: "Commands"},
 		{Key: "Ctrl+S", Desc: "Switch Session"},
-		{Key: "Ctrl+I", Desc: "Interrupt"},
-		{Key: "Ctrl+H", Desc: "Help"},
+		{Key: "Ctrl+N", Desc: "New Session"},
 		{Key: "Ctrl+C", Desc: "Quit"},
 	})
 }

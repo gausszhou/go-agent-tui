@@ -20,7 +20,8 @@ type PermissionEvent struct {
 type AcpEventKind int
 
 const (
-	AcpAgentChunk AcpEventKind = iota
+	AcpUserChunk  AcpEventKind = iota
+	AcpAgentChunk
 	AcpToolCall
 	AcpToolUpdate
 	AcpPlan
@@ -71,6 +72,11 @@ func (c *ACPClient) RequestPermission(ctx context.Context, params acp.RequestPer
 func (c *ACPClient) SessionUpdate(ctx context.Context, params acp.SessionNotification) error {
 	u := params.Update
 	switch {
+	case u.UserMessageChunk != nil:
+		content := u.UserMessageChunk.Content
+		if content.Text != nil {
+			c.eventCh <- AcpEvent{Kind: AcpUserChunk, Text: content.Text.Text}
+		}
 	case u.AgentMessageChunk != nil:
 		content := u.AgentMessageChunk.Content
 		if content.Text != nil {

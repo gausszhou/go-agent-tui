@@ -113,8 +113,7 @@ func helpLabel() lipgloss.Style {
 func statusBarBg() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Background(surface()).
-		Foreground(muted()).
-		Padding(0, 1)
+		Foreground(muted())
 }
 
 func divider() lipgloss.Style {

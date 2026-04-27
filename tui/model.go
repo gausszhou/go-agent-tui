@@ -81,6 +81,7 @@ type Model struct {
 	chatViewport viewport.Model
 
 	promptRunning bool
+	interrupted   bool
 
 	errMsg     string
 	statusText string
@@ -184,6 +185,7 @@ func (m *Model) updateChatViewport() {
 
 func (m *Model) interruptPrompt() {
 	m.sendInput(client.InputCommand{Type: client.CmdInterrupt})
+	m.interrupted = true
 	m.statusText = "Interrupted"
 }
 

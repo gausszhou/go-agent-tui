@@ -15,7 +15,7 @@ type StatusBar struct {
 func NewStatusBar() StatusBar {
 	return StatusBar{
 		Style: lipgloss.NewStyle().
-			Background(lipgloss.Color("#302c2c")).
+			Background(lipgloss.Color("#0c0c0c")).
 			Foreground(lipgloss.Color("#9a9898")),
 	}
 }

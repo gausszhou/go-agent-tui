@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/coder/acp-go-sdk"
 
 	"github.com/gausszhou/go-agent-tui/client"
@@ -70,7 +71,6 @@ type Model struct {
 	sessions        []Session
 	activeSessionID string
 	sessionList     component.SessionList
-	showSessionList bool
 
 	usageInfo component.UsageInfo
 	todoList  component.TodoList
@@ -99,11 +99,14 @@ func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.
 	ta := textarea.New()
 	ta.Placeholder = "Type a message... (Enter to send, Shift+Enter for newline)"
 	ta.SetWidth(80)
-	ta.SetHeight(3)
+	ta.SetHeight(5)
 	ta.Focus()
 	ta.CharLimit = 0
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "enter"))
+	ta.FocusedStyle.Base = ta.FocusedStyle.Base.Background(lipgloss.Color("#1e1e1e"))
+	ta.BlurredStyle.Base = ta.BlurredStyle.Base.Background(lipgloss.Color("#1e1e1e"))
+	ta.FocusedStyle.CursorLine = ta.FocusedStyle.CursorLine.Background(lipgloss.Color("#1e1e1e"))
 
 	vp := viewport.New(80, 20)
 

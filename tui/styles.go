@@ -84,7 +84,7 @@ func overlayBox() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(warning()).
-		Background(surface()).
+		Background(lipgloss.Color("#1e1e1e")).
 		Padding(1, 2)
 }
 
@@ -98,7 +98,7 @@ func helpLabel() lipgloss.Style {
 
 func statusBarBg() lipgloss.Style {
 	return lipgloss.NewStyle().
-		Background(surface()).
+		Background(lipgloss.Color("#0c0c0c")).
 		Foreground(muted())
 }
 

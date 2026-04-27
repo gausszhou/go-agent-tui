@@ -128,16 +128,19 @@ func (m Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
 func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 	switch {
 	case u.UserMessageChunk != nil:
+		m.logger.Debug("session update: user message chunk")
 		if u.UserMessageChunk.Content.Text != nil && !m.promptRunning {
 			m.addMessage(component.ChatMessage{Role: component.RoleUser, Content: u.UserMessageChunk.Content.Text.Text})
 			m.viewportDirty = true
 		}
 	case u.AgentMessageChunk != nil:
+		m.logger.Debug("session update: agent message chunk")
 		if u.AgentMessageChunk.Content.Text != nil {
 			m.appendAgentText(u.AgentMessageChunk.Content.Text.Text)
 			m.viewportDirty = true
 		}
 	case u.ToolCall != nil:
+		m.logger.Debug("session update: tool call", "id", string(u.ToolCall.ToolCallId))
 		tc := u.ToolCall
 		m.addMessage(component.ChatMessage{
 			Role:          component.RoleTool,
@@ -152,12 +155,14 @@ func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 		if tu.Status != nil {
 			status = string(*tu.Status)
 		}
+		m.logger.Debug("session update: tool call update", "id", string(tu.ToolCallId), "status", status)
 		m.addMessage(component.ChatMessage{
 			Role:    component.RoleSystem,
 			Content: "Tool " + string(tu.ToolCallId) + " status: " + status,
 		})
 		m.viewportDirty = true
 	case u.Plan != nil:
+		m.logger.Debug("session update: plan", "entries", len(u.Plan.Entries))
 		plan := u.Plan
 		for i, entry := range plan.Entries {
 			m.todoList.AddItem(component.TodoItem{
@@ -167,6 +172,8 @@ func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 			})
 		}
 		m.viewportDirty = true
+	default:
+		m.logger.Debug("session update: unknown type")
 	}
 	return m, m.waitForOutput()
 }
@@ -256,7 +263,6 @@ func (m Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.statusText = "Loading " + sess.Name + "..."
 			m.focus = FocusInput
-			m.showSessionList = false
 			m.loading = true
 			m.promptRunning = false
 			m.messages = nil
@@ -268,10 +274,8 @@ func (m Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.waitForOutput(), spinnerTick())
 		}
 		m.focus = FocusInput
-		m.showSessionList = false
 		return m, nil
 	case "esc", "ctrl+s":
-		m.showSessionList = false
 		m.focus = FocusInput
 		return m, nil
 	case "ctrl+c":
@@ -301,12 +305,8 @@ func (m Model) handleCommandPanelKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.sendInput(client.InputCommand{Type: client.CmdNewSession})
 			return m, tea.Batch(m.waitForOutput(), spinnerTick())
 		case 1:
-			if len(m.sessions) > 1 {
-				m.showSessionList = true
-				m.focus = FocusSessionList
-				return m, nil
-			}
-			m.focus = FocusInput
+			m.focus = FocusSessionList
+			m.sessionList.SelectedIdx = 0
 			return m, nil
 		case 2:
 			m.cleanup()
@@ -368,10 +368,8 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "ctrl+s":
-		if len(m.sessions) > 1 {
-			m.showSessionList = true
-			m.focus = FocusSessionList
-		}
+		m.focus = FocusSessionList
+		m.sessionList.SelectedIdx = 0
 		return m, nil
 
 	case "esc":

@@ -21,6 +21,9 @@ func (m Model) View() string {
 	case FocusCommandPanel:
 		fg := m.renderCommandPanelOverlay()
 		return overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0)
+	case FocusSessionList:
+		fg := m.renderSessionOverlay()
+		return overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0)
 	}
 
 	return bg
@@ -33,7 +36,7 @@ func (m Model) renderMainView() string {
 		rightW = 22
 		leftW = m.width - rightW - 1
 	}
-	chatH := m.height - 4
+	chatH := m.height - 7
 
 	left := m.renderLeft(leftW, chatH)
 	right := m.renderRight(rightW)
@@ -67,24 +70,16 @@ func (m Model) renderLeft(width, chatH int) string {
 	m.statusBar.Style = statusBarBg()
 	status := m.statusBar.View()
 
-	return lipgloss.JoinVertical(lipgloss.Left, chat, input, status)
+	return lipgloss.JoinVertical(lipgloss.Left, chat, input, lipgloss.NewStyle().Height(1).Render(""), status)
 }
 
 func (m Model) renderRight(width int) string {
-	var parts []string
-
-	tasks := base().
-		Width(width).Padding(0, 1).
-		Render(m.todoList.View())
-	parts = append(parts, tasks)
-
-	sess := base().
-		Width(width).Padding(0, 1).
-		Render(m.sessionList.View())
-	parts = append(parts, sess)
-
-	content := lipgloss.JoinVertical(lipgloss.Top, parts...)
-	return base().Width(width).Height(m.height).Render(content)
+	return lipgloss.NewStyle().Width(width).Height(m.height).
+		Background(lipgloss.Color("#141414")).
+		Render(lipgloss.NewStyle().Width(width).Padding(0, 1).
+			Background(lipgloss.Color("#141414")).
+			Foreground(text()).
+			Render(m.todoList.View()))
 }
 
 func (m Model) renderInput(width int) string {
@@ -115,7 +110,7 @@ func (m Model) renderInput(width int) string {
 		}
 	}
 
-	return sb.String()
+	return lipgloss.NewStyle().Width(width).Background(lipgloss.Color("#1e1e1e")).Render(sb.String())
 }
 
 func (m Model) renderPermissionOverlay() string {
@@ -157,20 +152,52 @@ func (m Model) renderCommandPanelOverlay() string {
 		{"Quit"},
 	}
 
+	itemW := 45
+
 	for i, opt := range options {
 		if i == m.commandPanelIdx {
-			sb.WriteString(lipgloss.NewStyle().Foreground(text()).Background(accent()).Padding(0, 1).Render("▶ " + opt.label))
+			sb.WriteString(lipgloss.NewStyle().Width(itemW).Foreground(text()).Background(accent()).Padding(0, 1).Render("▶ " + opt.label))
 		} else {
-			sb.WriteString(lipgloss.NewStyle().Foreground(muted()).Padding(0, 1).Render("  " + opt.label))
+			sb.WriteString(lipgloss.NewStyle().Width(itemW).Foreground(muted()).Background(lipgloss.Color("#1e1e1e")).Padding(0, 1).Render("  " + opt.label))
 		}
 		sb.WriteString("\n")
 	}
 
 	sb.WriteString("\n")
-	sb.WriteString(helpLabel().Render("↑↓ navigate  Enter select  Esc cancel"))
+	sb.WriteString(helpLabel().Background(lipgloss.Color("#1e1e1e")).Render("↑↓ navigate  Enter select  Esc cancel"))
 
 	content := sb.String()
-	return overlayBox().Width(30).Render(content)
+	return overlayBox().Width(50).Render(content)
+}
+
+func (m Model) renderSessionOverlay() string {
+	var sb strings.Builder
+
+	title := lipgloss.NewStyle().Foreground(accent()).Bold(true).Render("Sessions")
+	sb.WriteString(title)
+	sb.WriteString("\n\n")
+
+	itemW := 45
+
+	for i, sess := range m.sessionList.Sessions {
+		marker := " "
+		color := muted()
+		if sess.Active {
+			marker = "●"
+			color = success()
+		}
+		if i == m.sessionList.SelectedIdx {
+			sb.WriteString(lipgloss.NewStyle().Width(itemW).Foreground(text()).Background(accent()).Padding(0, 1).Render("▶ " + marker + " " + sess.Name))
+		} else {
+			sb.WriteString(lipgloss.NewStyle().Width(itemW).Foreground(color).Background(lipgloss.Color("#1e1e1e")).Padding(0, 1).Render("  " + marker + " " + sess.Name))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\n")
+	sb.WriteString(helpLabel().Background(lipgloss.Color("#1e1e1e")).Render("↑↓ navigate  Enter select  Esc cancel"))
+
+	return overlayBox().Width(50).Render(sb.String())
 }
 
 func visibleLineCount(s string) int {

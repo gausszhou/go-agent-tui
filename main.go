@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 
 	tea "github.com/charmbracelet/bubbletea"
+	acpsdk "github.com/coder/acp-go-sdk"
 	"github.com/spf13/cobra"
 
+	"github.com/gausszhou/go-agent-tui/client"
 	"github.com/gausszhou/go-agent-tui/tui"
 )
 
@@ -19,23 +23,7 @@ var rootCmd = &cobra.Command{
 	Use:   "go-agent-tui",
 	Short: "A TUI application for interacting with AI agents via ACP protocol",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger := setupLogger(debug)
-
-		model := tui.NewModel(debug, logger)
-		program := tea.NewProgram(
-			model,
-			tea.WithAltScreen(),
-			tea.WithMouseCellMotion(),
-		)
-
-		if _, err := program.Run(); err != nil {
-			if debug && logger != nil {
-				logger.Error("program error", "error", err)
-			}
-			return err
-		}
-
-		return nil
+		return run(debug)
 	},
 }
 
@@ -48,6 +36,58 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func run(debug bool) error {
+	logger := setupLogger(debug)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	inCh := make(chan client.InputCommand, 100)
+	outCh := make(chan client.OutputEvent, 100)
+	sigCh := make(chan interface{}, 10)
+
+	acp := client.NewClient(inCh, outCh, sigCh)
+
+	cmd := exec.CommandContext(ctx, "opencode", "acp")
+	conn, err := client.NewConnection(cmd, acp, logger)
+	if err != nil {
+		return fmt.Errorf("connection failed: %w", err)
+	}
+
+	initResp, err := conn.Initialize(ctx, acpsdk.InitializeRequest{
+		ProtocolVersion: acpsdk.ProtocolVersionNumber,
+		ClientCapabilities: acpsdk.ClientCapabilities{
+			Fs:       acpsdk.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
+			Terminal: true,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("initialize failed: %w", err)
+	}
+	if debug {
+		logger.Info("agent initialized", "protocol_version", initResp.ProtocolVersion)
+	}
+
+	newSess, err := conn.NewSession(ctx, acpsdk.NewSessionRequest{
+		Cwd:        client.MustCwd(),
+		McpServers: []acpsdk.McpServer{},
+	})
+	if err != nil {
+		return fmt.Errorf("new session failed: %w", err)
+	}
+	if debug {
+		logger.Info("session created", "session_id", newSess.SessionId)
+	}
+
+	go acp.Run(ctx, conn)
+
+	model := tui.NewModel(debug, logger, acp, cmd, string(newSess.SessionId), ctx, cancel, inCh, outCh)
+	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	if _, err := p.Run(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func setupLogger(debug bool) *slog.Logger {

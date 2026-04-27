@@ -42,26 +42,18 @@ type outputEventMsg struct {
 	event client.OutputEvent
 }
 
-type initDoneMsg struct {
-	sessionID string
-	err       error
-	acpClient *client.ACPClient
-	cmd       *exec.Cmd
-}
-
 type Model struct {
 	width  int
 	height int
 	debug  bool
 	logger *slog.Logger
 
+	acp      *client.ACPClient
 	inputCh  chan client.InputCommand
 	outputCh chan client.OutputEvent
-
-	acpClient *client.ACPClient
-	cmd       *exec.Cmd
-	ctx       context.Context
-	cancel    context.CancelFunc
+	cmd      *exec.Cmd
+	ctx context.Context
+	cancel context.CancelFunc
 
 	focus FocusArea
 
@@ -102,9 +94,7 @@ type Model struct {
 	viewportDirty       bool
 }
 
-func NewModel(debug bool, logger *slog.Logger) Model {
-	ctx, cancel := context.WithCancel(context.Background())
-
+func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.Cmd, sessionID string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) Model {
 	ta := textarea.New()
 	ta.Placeholder = "Type a message... (Enter to send, Shift+Enter for newline)"
 	ta.SetWidth(80)
@@ -116,88 +106,44 @@ func NewModel(debug bool, logger *slog.Logger) Model {
 
 	vp := viewport.New(80, 20)
 
-	inCh := make(chan client.InputCommand, 100)
-	outCh := make(chan client.OutputEvent, 100)
-
 	return Model{
 		debug:  debug,
 		logger: logger,
 
+		acp:    acp,
+		inputCh:  inputCh,
+		outputCh: outputCh,
+		cmd:    cmd,
 		ctx:    ctx,
 		cancel: cancel,
 
-		inputCh:  inCh,
-		outputCh: outCh,
+		activeSessionID: sessionID,
 
 		focus: FocusInput,
 
 		textarea: ta,
 		spinner:  component.NewLoading(loadingSpinner()),
-		loading:  true,
+		loading:  false,
 
-		sessions:     []Session{},
-		sessionList:  component.NewSessionList("Sessions"),
+		sessions: []Session{
+			{ID: sessionID, Name: "Session 1", CWD: client.MustCwd()},
+		},
+		sessionList: component.SessionList{
+			Sessions: []component.SessionItem{
+				{ID: sessionID, Name: "Session 1", Active: true},
+			},
+		},
 		usageInfo:    component.NewUsageInfo(),
 		todoList:     component.NewTodoList("Tasks"),
 		statusBar:    component.NewStatusBar(),
 		chatViewport: vp,
 
-		statusText: "Connecting...",
+		statusText: "Ready",
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
-		func() tea.Msg {
-			in := m.inputCh
-			out := m.outputCh
-			acpClient := client.NewClient(in, out, nil)
-			if m.debug && m.logger != nil {
-				m.logger.Info("starting agent process")
-			}
-
-			cmd := exec.CommandContext(m.ctx, "opencode", "acp")
-			conn, err := client.NewConnection(cmd, acpClient, m.logger)
-			if err != nil {
-				return initDoneMsg{err: err}
-			}
-
-			initResp, err := conn.Initialize(m.ctx, acp.InitializeRequest{
-				ProtocolVersion: acp.ProtocolVersionNumber,
-				ClientCapabilities: acp.ClientCapabilities{
-					Fs:       acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
-					Terminal: true,
-				},
-			})
-			if err != nil {
-				return initDoneMsg{err: err}
-			}
-			if m.debug && m.logger != nil {
-				m.logger.Info("agent initialized", "protocol_version", initResp.ProtocolVersion)
-			}
-
-			newSess, err := conn.NewSession(m.ctx, acp.NewSessionRequest{
-				Cwd:        client.MustCwd(),
-				McpServers: []acp.McpServer{},
-			})
-			if err != nil {
-				return initDoneMsg{err: err}
-			}
-			if m.debug && m.logger != nil {
-				m.logger.Info("session created", "session_id", newSess.SessionId)
-			}
-
-			go acpClient.Run(m.ctx, conn)
-
-			return initDoneMsg{
-				sessionID: string(newSess.SessionId),
-				acpClient: acpClient,
-				cmd:       cmd,
-			}
-		},
-		spinnerTick(),
-		renderTick(),
-	)
+	return tea.Batch(spinnerTick(), renderTick())
 }
 
 func (m *Model) sendInput(cmd client.InputCommand) {

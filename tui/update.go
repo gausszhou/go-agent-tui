@@ -34,30 +34,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, renderTick()
 
-	case initDoneMsg:
-		if msg.err != nil {
-			m.statusText = "Init failed: " + msg.err.Error()
-			m.loading = false
-			m.errMsg = msg.err.Error()
-			return m, nil
-		}
-		m.acpClient = msg.acpClient
-		m.cmd = msg.cmd
-		m.activeSessionID = msg.sessionID
-		m.sessions = append(m.sessions, Session{
-			ID:   msg.sessionID,
-			Name: "Session 1",
-			CWD:  client.MustCwd(),
-		})
-		m.sessionList.Sessions = append(m.sessionList.Sessions, component.SessionItem{
-			ID:     msg.sessionID,
-			Name:   "Session 1",
-			Active: true,
-		})
-		m.loading = false
-		m.statusText = "Ready"
-		return m, nil
-
 	case outputEventMsg:
 		return m.handleOutputEvent(msg.event)
 

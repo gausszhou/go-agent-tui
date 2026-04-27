@@ -52,18 +52,18 @@ type OutputEvent struct {
 }
 
 type ACPClient struct {
-	inputCh  <-chan InputCommand
-	outputCh chan<- OutputEvent
-	signalCh chan<- interface{}
+	Input  <-chan InputCommand
+	Output chan<- OutputEvent
+	Signal chan<- interface{}
 }
 
 var _ acp.Client = (*ACPClient)(nil)
 
-func NewClient(inputCh <-chan InputCommand, outputCh chan<- OutputEvent, signalCh chan<- interface{}) *ACPClient {
+func NewClient(input <-chan InputCommand, output chan<- OutputEvent, signal chan<- interface{}) *ACPClient {
 	return &ACPClient{
-		inputCh:  inputCh,
-		outputCh: outputCh,
-		signalCh: signalCh,
+		Input:  input,
+		Output: output,
+		Signal: signal,
 	}
 }
 
@@ -72,7 +72,7 @@ func (c *ACPClient) Run(ctx context.Context, conn *acp.ClientSideConnection) {
 
 	for {
 		select {
-		case cmd, ok := <-c.inputCh:
+		case cmd, ok := <-c.Input:
 			if !ok {
 				return
 			}
@@ -80,16 +80,16 @@ func (c *ACPClient) Run(ctx context.Context, conn *acp.ClientSideConnection) {
 			case CmdPrompt:
 				pCtx, cancel := context.WithCancel(ctx)
 				promptCancel = cancel
-				go doPrompt(pCtx, conn, c.outputCh, cmd)
+				go doPrompt(pCtx, conn, c.Output, cmd)
 			case CmdInterrupt:
 				if promptCancel != nil {
 					promptCancel()
 					promptCancel = nil
 				}
 			case CmdNewSession:
-				go doNewSession(ctx, conn, c.outputCh, cmd)
+				go doNewSession(ctx, conn, c.Output, cmd)
 			case CmdLoadSession:
-				go doLoadSession(ctx, conn, c.outputCh, cmd)
+				go doLoadSession(ctx, conn, c.Output, cmd)
 			}
 		case <-ctx.Done():
 			return
@@ -99,7 +99,7 @@ func (c *ACPClient) Run(ctx context.Context, conn *acp.ClientSideConnection) {
 
 func (c *ACPClient) RequestPermission(ctx context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
 	respCh := make(chan acp.RequestPermissionResponse, 1)
-	c.outputCh <- OutputEvent{
+	c.Output <- OutputEvent{
 		Kind: EventPermission,
 		Permission: &PermissionRequest{
 			Req:      params,
@@ -115,7 +115,7 @@ func (c *ACPClient) RequestPermission(ctx context.Context, params acp.RequestPer
 }
 
 func (c *ACPClient) SessionUpdate(ctx context.Context, params acp.SessionNotification) error {
-	c.outputCh <- OutputEvent{Update: &params.Update}
+	c.Output <- OutputEvent{Update: &params.Update}
 	return nil
 }
 
@@ -207,15 +207,15 @@ func MustCwd() string {
 	return wd
 }
 
-func doPrompt(ctx context.Context, conn *acp.ClientSideConnection, outputCh chan<- OutputEvent, cmd InputCommand) {
+func doPrompt(ctx context.Context, conn *acp.ClientSideConnection, output chan<- OutputEvent, cmd InputCommand) {
 	_, err := conn.Prompt(ctx, acp.PromptRequest{
 		SessionId: acp.SessionId(cmd.SessionID),
 		Prompt:    []acp.ContentBlock{acp.TextBlock(cmd.Text)},
 	})
-	outputCh <- OutputEvent{Kind: EventPromptDone, Error: err}
+	output <- OutputEvent{Kind: EventPromptDone, Error: err}
 }
 
-func doNewSession(ctx context.Context, conn *acp.ClientSideConnection, outputCh chan<- OutputEvent, cmd InputCommand) {
+func doNewSession(ctx context.Context, conn *acp.ClientSideConnection, output chan<- OutputEvent, cmd InputCommand) {
 	cwd := cmd.CWD
 	if cwd == "" {
 		cwd = MustCwd()
@@ -225,13 +225,13 @@ func doNewSession(ctx context.Context, conn *acp.ClientSideConnection, outputCh 
 		McpServers: []acp.McpServer{},
 	})
 	if err != nil {
-		outputCh <- OutputEvent{Kind: EventSessionCreated, Error: err}
+		output <- OutputEvent{Kind: EventSessionCreated, Error: err}
 		return
 	}
-	outputCh <- OutputEvent{Kind: EventSessionCreated, SessionID: string(newSess.SessionId)}
+	output <- OutputEvent{Kind: EventSessionCreated, SessionID: string(newSess.SessionId)}
 }
 
-func doLoadSession(ctx context.Context, conn *acp.ClientSideConnection, outputCh chan<- OutputEvent, cmd InputCommand) {
+func doLoadSession(ctx context.Context, conn *acp.ClientSideConnection, output chan<- OutputEvent, cmd InputCommand) {
 	cwd := cmd.CWD
 	if cwd == "" {
 		cwd = MustCwd()
@@ -241,5 +241,5 @@ func doLoadSession(ctx context.Context, conn *acp.ClientSideConnection, outputCh
 		Cwd:       cwd,
 		McpServers: []acp.McpServer{},
 	})
-	outputCh <- OutputEvent{Kind: EventSessionLoaded, Error: err}
+	output <- OutputEvent{Kind: EventSessionLoaded, Error: err}
 }

@@ -106,7 +106,6 @@ type Model struct {
 	statusBar component.StatusBar
 
 	showHelp     bool
-	commandPanel component.CommandPanel
 	commandPanelIdx int
 
 	chatViewport viewport.Model
@@ -118,6 +117,7 @@ type Model struct {
 	statusText  string
 	lastKeyTime time.Time
 	lastEscTime time.Time
+	viewportFocused bool
 }
 
 func NewModel(debug bool, logger *slog.Logger) Model {
@@ -157,7 +157,6 @@ func NewModel(debug bool, logger *slog.Logger) Model {
 		usageInfo:      component.NewUsageInfo(),
 		todoList:       component.NewTodoList("Tasks"),
 		statusBar:      component.NewStatusBar(),
-		commandPanel:   component.DefaultCommands(),
 		chatViewport:   vp,
 
 		statusText: "Connecting...",

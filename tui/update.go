@@ -324,7 +324,7 @@ func (m Model) handleCommandPanelKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "down", "j":
-		if m.commandPanelIdx < 1 {
+		if m.commandPanelIdx < 2 {
 			m.commandPanelIdx++
 		}
 		return m, nil
@@ -342,6 +342,9 @@ func (m Model) handleCommandPanelKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.focus = FocusInput
 			return m, nil
+		case 2:
+			m.cleanup()
+			return m, tea.Quit
 		}
 		m.focus = FocusInput
 		return m, nil
@@ -416,13 +419,25 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cleanup()
 		return m, tea.Quit
 
-	case "ctrl+up", "ctrl+k":
-		m.chatViewport.LineUp(1)
-		return m, nil
+	case "up", "k":
+		if m.viewportFocused {
+			m.chatViewport.LineUp(1)
+			return m, nil
+		}
+		m.lastKeyTime = time.Now()
+		var cmd tea.Cmd
+		m.textarea, cmd = m.textarea.Update(msg)
+		return m, cmd
 
-	case "ctrl+down", "ctrl+j":
-		m.chatViewport.LineDown(1)
-		return m, nil
+	case "down", "j":
+		if m.viewportFocused {
+			m.chatViewport.LineDown(1)
+			return m, nil
+		}
+		m.lastKeyTime = time.Now()
+		var cmd tea.Cmd
+		m.textarea, cmd = m.textarea.Update(msg)
+		return m, cmd
 
 	case "pgup":
 		m.chatViewport.PageUp()
@@ -449,6 +464,16 @@ func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		m.chatViewport, cmd = m.chatViewport.Update(msg)
 		cmds = append(cmds, cmd)
 
+	case tea.MouseButtonLeft:
+		if msg.Action == tea.MouseActionPress {
+			leftW := m.width * 68 / 100
+			if msg.X > 0 && msg.X < leftW && msg.Y >= 0 && msg.Y < m.chatViewport.Height {
+				m.viewportFocused = true
+			} else {
+				m.viewportFocused = false
+			}
+		}
+		fallthrough
 	default:
 		if m.focus == FocusInput {
 			var cmd tea.Cmd

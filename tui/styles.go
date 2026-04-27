@@ -80,20 +80,6 @@ func errorText() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(danger())
 }
 
-func inputBox() lipgloss.Style {
-	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(border()).
-		Padding(0, 1)
-}
-
-func inputBoxFocused() lipgloss.Style {
-	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(accent()).
-		Padding(0, 1)
-}
-
 func overlayBox() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
@@ -119,12 +105,4 @@ func statusBarBg() lipgloss.Style {
 func divider() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Foreground(dim())
-}
-
-func scrollbar() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(surface())
-}
-
-func scrollbarThumb() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(border())
 }

@@ -27,9 +27,9 @@ func NewSessionList(title string) SessionList {
 	return SessionList{
 		Title:       title,
 		TitleStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("#007aff")).Bold(true),
-		ActiveStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#30d158")).PaddingLeft(1),
-		NormalStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#9a9898")).PaddingLeft(1),
-		SelectStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#fdfcfc")).Background(lipgloss.Color("#007aff")).PaddingLeft(1),
+		ActiveStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#30d158")),
+		NormalStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#9a9898")),
+		SelectStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#fdfcfc")).Background(lipgloss.Color("#007aff")).Padding(0, 1),
 	}
 }
 
@@ -46,14 +46,20 @@ func (sl SessionList) View() string {
 	for i, sess := range sl.Sessions {
 		marker := ""
 		if sess.Active {
-			marker = "● "
+			marker = "●"
 		}
+
 		if i == sl.SelectedIdx {
-			sb.WriteString(sl.SelectStyle.Render(fmt.Sprintf("▶ %s%s", marker, truncate(sess.Name, 30))))
-		} else if sess.Active {
-			sb.WriteString(sl.ActiveStyle.Render(fmt.Sprintf("%s  %s", marker, truncate(sess.Name, 30))))
+			label := fmt.Sprintf("▶ %s %s", marker, truncate(sess.Name, 28))
+			sb.WriteString(sl.SelectStyle.Render(label))
 		} else {
-			sb.WriteString(sl.NormalStyle.Render(fmt.Sprintf("%s  %s", marker, truncate(sess.Name, 30))))
+			prefix := "   "
+			label := fmt.Sprintf("%s %s", marker, truncate(sess.Name, 28))
+			if sess.Active {
+				sb.WriteString(sl.ActiveStyle.Render(prefix + label))
+			} else {
+				sb.WriteString(sl.NormalStyle.Render(prefix + label))
+			}
 		}
 		sb.WriteString("\n")
 	}

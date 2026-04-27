@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/coder/acp-go-sdk"
@@ -301,8 +302,18 @@ func (m Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	switch key := msg.String(); key {
 	case "enter", "ctrl+e":
+		now := time.Now()
+		pasting := !m.lastKeyTime.IsZero() && now.Sub(m.lastKeyTime) < 20*time.Millisecond
+		m.lastKeyTime = now
+
+		if pasting {
+			var cmd tea.Cmd
+			m.textarea, cmd = m.textarea.Update(msg)
+			return m, cmd
+		}
+
 		text := strings.TrimSpace(m.textarea.Value())
 		if text == "" {
 			return m, nil
@@ -350,6 +361,7 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	default:
+		m.lastKeyTime = time.Now()
 		var cmd tea.Cmd
 		m.textarea, cmd = m.textarea.Update(msg)
 		return m, cmd

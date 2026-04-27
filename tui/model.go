@@ -110,6 +110,7 @@ type Model struct {
 
 	errMsg      string
 	statusText  string
+	lastKeyTime time.Time
 }
 
 func NewModel(debug bool, logger *slog.Logger) Model {
@@ -122,7 +123,7 @@ func NewModel(debug bool, logger *slog.Logger) Model {
 	ta.Focus()
 	ta.CharLimit = 0
 	ta.ShowLineNumbers = false
-	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter"))
+	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "enter"))
 
 	vp := viewport.New(80, 20)
 

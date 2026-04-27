@@ -237,6 +237,21 @@ func (a *exampleAgent) simulateTurn(ctx context.Context, sid string) error {
 		return err
 	}
 
+	// send a plan to structure the work
+	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
+		SessionId: acp.SessionId(sid),
+		Update: acp.UpdatePlan(
+			acp.PlanEntry{Content: "Read project files", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusPending},
+			acp.PlanEntry{Content: "Modify configuration", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusPending},
+			acp.PlanEntry{Content: "Verify changes", Priority: acp.PlanEntryPriorityMedium, Status: acp.PlanEntryStatusPending},
+		),
+	}); err != nil {
+		return err
+	}
+	if err := pause(ctx, 500*time.Millisecond); err != nil {
+		return err
+	}
+
 	// tool call without permission
 	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
 		SessionId: acp.SessionId(sid),
@@ -268,6 +283,18 @@ func (a *exampleAgent) simulateTurn(ctx context.Context, sid string) error {
 		return err
 	}
 	if err := pause(ctx, time.Second); err != nil {
+		return err
+	}
+
+	// update plan: first task completed, second in progress
+	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
+		SessionId: acp.SessionId(sid),
+		Update: acp.UpdatePlan(
+			acp.PlanEntry{Content: "Read project files", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusCompleted},
+			acp.PlanEntry{Content: "Modify configuration", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusInProgress},
+			acp.PlanEntry{Content: "Verify changes", Priority: acp.PlanEntryPriorityMedium, Status: acp.PlanEntryStatusPending},
+		),
+	}); err != nil {
 		return err
 	}
 
@@ -346,6 +373,9 @@ func (a *exampleAgent) simulateTurn(ctx context.Context, sid string) error {
 		}); err != nil {
 			return err
 		}
+
+		// final plan: all complete, plus usage
+		a.sendPlanAndUsage(ctx, sid)
 	case "reject":
 		if err := pause(ctx, time.Second); err != nil {
 			return err
@@ -356,10 +386,36 @@ func (a *exampleAgent) simulateTurn(ctx context.Context, sid string) error {
 		}); err != nil {
 			return err
 		}
+
+		a.sendPlanAndUsage(ctx, sid)
 	default:
 		return fmt.Errorf("unexpected permission option: %s", permResp.Outcome.Selected.OptionId)
 	}
 	return nil
+}
+
+func (a *exampleAgent) sendPlanAndUsage(ctx context.Context, sid string) {
+	// final plan: all tasks completed
+	_ = a.conn.SessionUpdate(ctx, acp.SessionNotification{
+		SessionId: acp.SessionId(sid),
+		Update: acp.UpdatePlan(
+			acp.PlanEntry{Content: "Read project files", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusCompleted},
+			acp.PlanEntry{Content: "Modify configuration", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusCompleted},
+			acp.PlanEntry{Content: "Verify changes", Priority: acp.PlanEntryPriorityMedium, Status: acp.PlanEntryStatusCompleted},
+		),
+	})
+
+	// usage update with token counts and cost
+	_ = a.conn.SessionUpdate(ctx, acp.SessionNotification{
+		SessionId: acp.SessionId(sid),
+		Update: acp.SessionUpdate{
+			UsageUpdate: &acp.SessionUsageUpdate{
+				Used: 2847,
+				Size: 128000,
+				Cost: &acp.Cost{Amount: 0.12, Currency: "USD"},
+			},
+		},
+	})
 }
 
 func randomID() string {

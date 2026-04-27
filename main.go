@@ -43,9 +43,9 @@ func run(debug bool) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	inCh := make(chan client.InputCommand, 100)
-	outCh := make(chan client.OutputEvent, 100)
-	sigCh := make(chan interface{}, 10)
+	inCh := make(chan client.InputCommand, 1)
+	outCh := make(chan client.OutputEvent, 1)
+	sigCh := make(chan interface{}, 1)
 
 	acp := client.NewClient(inCh, outCh, sigCh)
 

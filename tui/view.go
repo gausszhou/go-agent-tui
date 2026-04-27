@@ -175,28 +175,39 @@ func (m Model) renderCommandPanelOverlay() string {
 }
 
 func renderScrollbar(height, totalLines, yOffset int) string {
-	if totalLines <= height || height <= 0 {
-		return lipgloss.NewStyle().Width(1).Height(height).Render("")
+	if height <= 0 {
+		return ""
+	}
+	trackStyle := lipgloss.NewStyle().Foreground(dim())
+	thumbStyle := lipgloss.NewStyle().Foreground(border())
+
+	var sb strings.Builder
+	if totalLines <= height {
+		for i := 0; i < height; i++ {
+			sb.WriteString(trackStyle.Render(" "))
+			sb.WriteByte('\n')
+		}
+		return sb.String()
 	}
 
 	thumbH := max(1, height*height/totalLines)
 	maxOffset := totalLines - height
 	if maxOffset <= 0 {
-		return lipgloss.NewStyle().Width(1).Height(height).Render("")
+		for i := 0; i < height; i++ {
+			sb.WriteString(trackStyle.Render(" "))
+			sb.WriteByte('\n')
+		}
+		return sb.String()
 	}
 	thumbY := yOffset * (height - thumbH) / maxOffset
 
-	trackStyle := lipgloss.NewStyle().Foreground(dim())
-	thumbStyle := lipgloss.NewStyle().Foreground(border())
-
-	var sb strings.Builder
 	for i := 0; i < height; i++ {
 		if i >= thumbY && i < thumbY+thumbH {
 			sb.WriteString(thumbStyle.Render("█"))
 		} else {
 			sb.WriteString(trackStyle.Render("│"))
 		}
-		sb.WriteString("\n")
+		sb.WriteByte('\n')
 	}
 	return sb.String()
 }

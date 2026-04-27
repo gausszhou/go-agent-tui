@@ -38,7 +38,7 @@ func (m Model) renderMainView() string {
 	left := m.renderLeft(leftW, chatH)
 	right := m.renderRight(rightW)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, divider().Render("│"), right)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 }
 
 func (m Model) renderLeft(width, chatH int) string {
@@ -75,15 +75,11 @@ func (m Model) renderRight(width int) string {
 	var parts []string
 
 	tasks := base().
-		BorderTop(true).BorderStyle(lipgloss.NormalBorder()).
-		BorderTopForeground(border()).
 		Width(width).Padding(0, 1).
 		Render(m.todoList.View())
 	parts = append(parts, tasks)
 
 	sess := base().
-		BorderTop(true).BorderStyle(lipgloss.NormalBorder()).
-		BorderTopForeground(border()).
 		Width(width).Padding(0, 1).
 		Render(m.sessionList.View())
 	parts = append(parts, sess)
@@ -100,7 +96,7 @@ func (m Model) renderInput(width int) string {
 	if m.focus == FocusInput {
 		promptColor = accent()
 	}
-	m.textarea.Prompt = lipgloss.NewStyle().Width(5).PaddingLeft(1).Foreground(promptColor).Render("│ ")
+	m.textarea.Prompt = lipgloss.NewStyle().Width(promptWidth).Foreground(promptColor).Render("┃ ")
 
 	var sb strings.Builder
 	if m.errMsg != "" {

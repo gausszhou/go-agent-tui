@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -81,11 +82,12 @@ func (m Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.viewportDirty = false
 		m.updateChatViewport()
-		if ev.Error != nil {
+		if ev.Error != nil && ev.Error != context.Canceled {
 			m.statusText = "Error: " + ev.Error.Error()
 			m.errMsg = ev.Error.Error()
 		} else {
 			m.statusText = "Ready"
+			m.errMsg = ""
 		}
 		return m, nil
 

@@ -110,7 +110,7 @@ func (m Model) renderInput(width int) string {
 		}
 	}
 
-	return lipgloss.NewStyle().Width(width).Background(lipgloss.Color("#1e1e1e")).Render(sb.String())
+	return lipgloss.NewStyle().Width(width).Render(sb.String())
 }
 
 func (m Model) renderPermissionOverlay() string {

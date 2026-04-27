@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/charmbracelet/lipgloss"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/coder/acp-go-sdk"
 
 	"github.com/gausszhou/go-agent-tui/client"
@@ -21,7 +20,7 @@ import (
 type FocusArea int
 
 const (
-	FocusInput     FocusArea = iota
+	FocusInput FocusArea = iota
 	FocusPermission
 	FocusSessionList
 	FocusCommandPanel
@@ -53,8 +52,8 @@ type Model struct {
 	inputCh  chan client.InputCommand
 	outputCh chan client.OutputEvent
 	cmd      *exec.Cmd
-	ctx context.Context
-	cancel context.CancelFunc
+	ctx      context.Context
+	cancel   context.CancelFunc
 
 	focus FocusArea
 
@@ -104,9 +103,6 @@ func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.
 	ta.CharLimit = 0
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "enter"))
-	ta.FocusedStyle.Base = ta.FocusedStyle.Base.Background(lipgloss.Color("#1e1e1e"))
-	ta.BlurredStyle.Base = ta.BlurredStyle.Base.Background(lipgloss.Color("#1e1e1e"))
-	ta.FocusedStyle.CursorLine = ta.FocusedStyle.CursorLine.Background(lipgloss.Color("#1e1e1e"))
 
 	vp := viewport.New(80, 20)
 
@@ -114,12 +110,12 @@ func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.
 		debug:  debug,
 		logger: logger,
 
-		acp:    acp,
+		acp:      acp,
 		inputCh:  inputCh,
 		outputCh: outputCh,
-		cmd:    cmd,
-		ctx:    ctx,
-		cancel: cancel,
+		cmd:      cmd,
+		ctx:      ctx,
+		cancel:   cancel,
 
 		activeSessionID: sessionID,
 

@@ -458,6 +458,9 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
+	leftW := m.width * 68 / 100
+	barX := leftW - 1
+
 	switch msg.Button {
 	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
 		var cmd tea.Cmd
@@ -465,15 +468,61 @@ func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 
 	case tea.MouseButtonLeft:
-		if msg.Action == tea.MouseActionPress {
-			leftW := m.width * 68 / 100
-			if msg.X > 0 && msg.X < leftW && msg.Y >= 0 && msg.Y < m.chatViewport.Height {
-				m.viewportFocused = true
+		switch msg.Action {
+		case tea.MouseActionPress:
+			if msg.X == barX && msg.Y >= 0 && msg.Y < m.chatViewport.Height {
+				contentLines := strings.Count(m.chatViewport.View(), "\n") + 1
+				m.scrollDragging = true
+				m.scrollDragStartY = msg.Y
+				m.scrollDragStartYOffset = m.chatViewport.YOffset
+				if contentLines > m.chatViewport.Height && m.chatViewport.Height > 0 {
+					thumbH := max(1, m.chatViewport.Height*m.chatViewport.Height/contentLines)
+					maxOffset := contentLines - m.chatViewport.Height
+					thumbY := m.chatViewport.YOffset * (m.chatViewport.Height - thumbH) / maxOffset
+					if msg.Y < thumbY || msg.Y >= thumbY+thumbH {
+						targetY := msg.Y * maxOffset / (m.chatViewport.Height - thumbH)
+						if targetY < 0 {
+							targetY = 0
+						}
+						if targetY > maxOffset {
+							targetY = maxOffset
+						}
+						m.chatViewport.YOffset = targetY
+					}
+				}
 			} else {
-				m.viewportFocused = false
+				m.viewportFocused = msg.X > 0 && msg.X < leftW && msg.Y >= 0 && msg.Y < m.chatViewport.Height
 			}
+			if m.focus == FocusInput {
+				var cmd tea.Cmd
+				m.textarea, cmd = m.textarea.Update(msg)
+				cmds = append(cmds, cmd)
+			}
+
+		case tea.MouseActionMotion:
+			if m.scrollDragging && msg.X >= barX-2 && msg.X <= barX+2 {
+				contentLines := strings.Count(m.chatViewport.View(), "\n") + 1
+				if contentLines > m.chatViewport.Height && m.chatViewport.Height > 0 {
+					thumbH := max(1, m.chatViewport.Height*m.chatViewport.Height/contentLines)
+					maxOffset := contentLines - m.chatViewport.Height
+					if m.chatViewport.Height-thumbH > 0 {
+						deltaY := msg.Y - m.scrollDragStartY
+						newOffset := m.scrollDragStartYOffset + deltaY*maxOffset/(m.chatViewport.Height-thumbH)
+						if newOffset < 0 {
+							newOffset = 0
+						}
+						if newOffset > maxOffset {
+							newOffset = maxOffset
+						}
+						m.chatViewport.YOffset = newOffset
+					}
+				}
+			}
+
+		case tea.MouseActionRelease:
+			m.scrollDragging = false
 		}
-		fallthrough
+
 	default:
 		if m.focus == FocusInput {
 			var cmd tea.Cmd

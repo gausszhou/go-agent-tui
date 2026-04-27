@@ -117,7 +117,10 @@ type Model struct {
 	statusText  string
 	lastKeyTime time.Time
 	lastEscTime time.Time
-	viewportFocused bool
+	viewportFocused  bool
+	scrollDragging   bool
+	scrollDragStartY int
+	scrollDragStartYOffset int
 }
 
 func NewModel(debug bool, logger *slog.Logger) Model {

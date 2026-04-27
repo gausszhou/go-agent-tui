@@ -42,11 +42,17 @@ func (m Model) renderMainView() string {
 }
 
 func (m Model) renderLeft(width, chatH int) string {
-	m.chatViewport.Width = width
-	m.chatViewport.Height = chatH
-	m.chatViewport.SetContent(m.renderMessages())
+	barW := 1
+	vpW := width - barW
 
-	chat := m.chatViewport.View()
+	m.chatViewport.Width = vpW
+	m.chatViewport.Height = chatH
+	content := m.renderMessages()
+	m.chatViewport.SetContent(content)
+	vp := m.chatViewport.View()
+
+	sb := renderScrollbar(chatH, strings.Count(content, "\n")+1, m.chatViewport.YOffset)
+	chat := lipgloss.JoinHorizontal(lipgloss.Top, vp, sb)
 
 	input := m.renderInput(width)
 
@@ -68,13 +74,6 @@ func (m Model) renderLeft(width, chatH int) string {
 func (m Model) renderRight(width int) string {
 	var parts []string
 
-	model := base().
-		BorderTop(true).BorderStyle(lipgloss.NormalBorder()).
-		BorderTopForeground(border()).
-		Width(width).Padding(0, 1).
-		Render(m.usageInfo.View())
-	parts = append(parts, model)
-
 	tasks := base().
 		BorderTop(true).BorderStyle(lipgloss.NormalBorder()).
 		BorderTopForeground(border()).
@@ -93,14 +92,33 @@ func (m Model) renderRight(width int) string {
 }
 
 func (m Model) renderInput(width int) string {
-	m.textarea.SetWidth(width)
+	promptWidth := 2
+	m.textarea.SetWidth(width - promptWidth)
+
+	promptColor := muted()
+	if m.focus == FocusInput {
+		promptColor = accent()
+	}
+	prompt := lipgloss.NewStyle().Foreground(promptColor).Bold(true).Render("❯ ")
 
 	var sb strings.Builder
 	if m.errMsg != "" {
 		sb.WriteString(errorText().Width(width).Render("! " + m.errMsg))
 		sb.WriteString("\n")
 	}
-	sb.WriteString(m.textarea.View())
+
+	lines := strings.Split(m.textarea.View(), "\n")
+	for i, line := range lines {
+		if i > 0 {
+			sb.WriteString("\n")
+		}
+		if i == 0 {
+			sb.WriteString(prompt + line)
+		} else {
+			sb.WriteString("   " + line)
+		}
+	}
+
 	return sb.String()
 }
 
@@ -157,4 +175,31 @@ func (m Model) renderCommandPanelOverlay() string {
 
 	content := sb.String()
 	return overlayBox().Width(30).Render(content)
+}
+
+func renderScrollbar(height, totalLines, yOffset int) string {
+	if totalLines <= height || height <= 0 {
+		return lipgloss.NewStyle().Width(1).Height(height).Render("")
+	}
+
+	thumbH := max(1, height*height/totalLines)
+	maxOffset := totalLines - height
+	if maxOffset <= 0 {
+		return lipgloss.NewStyle().Width(1).Height(height).Render("")
+	}
+	thumbY := yOffset * (height - thumbH) / maxOffset
+
+	trackStyle := lipgloss.NewStyle().Foreground(dim())
+	thumbStyle := lipgloss.NewStyle().Foreground(border())
+
+	var sb strings.Builder
+	for i := 0; i < height; i++ {
+		if i >= thumbY && i < thumbY+thumbH {
+			sb.WriteString(thumbStyle.Render("█"))
+		} else {
+			sb.WriteString(trackStyle.Render("│"))
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }

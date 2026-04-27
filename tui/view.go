@@ -88,7 +88,8 @@ func (m Model) renderRight(width int) string {
 		Render(m.sessionList.View())
 	parts = append(parts, sess)
 
-	return lipgloss.JoinVertical(lipgloss.Top, parts...)
+	content := lipgloss.JoinVertical(lipgloss.Top, parts...)
+	return base().Width(width).Height(m.height).Render(content)
 }
 
 func (m Model) renderInput(width int) string {
@@ -99,7 +100,7 @@ func (m Model) renderInput(width int) string {
 	if m.focus == FocusInput {
 		promptColor = accent()
 	}
-	prompt := lipgloss.NewStyle().Foreground(promptColor).Bold(true).Render("❯ ")
+	prompt := lipgloss.NewStyle().Foreground(promptColor).Render("│ ")
 
 	var sb strings.Builder
 	if m.errMsg != "" {

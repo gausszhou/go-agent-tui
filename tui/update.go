@@ -13,15 +13,10 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.textarea.SetWidth(m.width * 2 / 3)
-		m.chatViewport.Width = m.width * 2 / 3
-		m.chatViewport.Height = m.height - 6
 		return m, nil
 
 	case spinnerTickMsg:
@@ -31,33 +26,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case initConnMsg:
-		if msg.err != nil {
-			m.statusText = "Connection failed: " + msg.err.Error()
-			m.loading = false
-			if m.debug && m.logger != nil {
-				m.logger.Error("connection failed", "error", msg.err)
-			}
-			return m, nil
-		}
-		m.loading = true
-		m.statusText = "Initializing..."
-		return m, tea.Batch(
-			m.doInitialize(msg.conn, msg.acpClient),
-			m.waitForEvents(),
-			spinnerTick(),
-		)
-
 	case initDoneMsg:
 		if msg.err != nil {
 			m.statusText = "Init failed: " + msg.err.Error()
 			m.loading = false
 			m.errMsg = msg.err.Error()
-			if m.debug && m.logger != nil {
-				m.logger.Error("init failed", "error", msg.err)
-			}
 			return m, nil
 		}
+		m.acpClient = msg.acpClient
+		m.cmd = msg.cmd
 		m.activeSessionID = msg.sessionID
 		m.sessions = append(m.sessions, Session{
 			ID:   msg.sessionID,
@@ -71,121 +48,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		m.loading = false
 		m.statusText = "Ready"
-		if m.debug && m.logger != nil {
-			m.logger.Info("ready", "session", msg.sessionID)
-		}
 		return m, nil
 
-	case acpEventMsg:
-		switch msg.event.Kind {
-		case client.AcpUserChunk:
-			m.addMessage(component.ChatMessage{Role: component.RoleUser, Content: msg.event.Text})
-			m.updateChatViewport()
-		case client.AcpAgentChunk:
-			m.appendAgentText(msg.event.Text)
-			m.updateChatViewport()
-		case client.AcpToolCall:
-			tc := msg.event.ToolCall
-			if tc != nil {
-				title := tc.Title
-				m.addMessage(component.ChatMessage{
-					Role:          component.RoleTool,
-					ToolCallTitle: title,
-					ToolCallID:    string(tc.ToolCallId),
-					ToolStatus:    string(tc.Status),
-				})
-				m.updateChatViewport()
-			}
-		case client.AcpToolUpdate:
-			tu := msg.event.ToolUpdate
-			if tu != nil {
-				status := ""
-				if tu.Status != nil {
-					status = string(*tu.Status)
-				}
-				m.addMessage(component.ChatMessage{
-					Role:          component.RoleSystem,
-					Content:       "Tool " + string(tu.ToolCallId) + " status: " + status,
-				})
-				m.updateChatViewport()
-			}
-		case client.AcpPlan:
-			plan := msg.event.Plan
-			if plan != nil {
-				for i, entry := range plan.Entries {
-					m.todoList.AddItem(component.TodoItem{
-						ID:     fmt.Sprintf("task-%d", i),
-						Title:  entry.Content,
-						Status: component.TodoPending,
-					})
-				}
-			}
-		case client.AcpError:
-			m.errMsg = msg.event.Error.Error()
-			m.statusText = "Error: " + msg.event.Error.Error()
-			m.loading = false
-		}
-		return m, m.waitForEvents()
-
-	case permEventMsg:
-		m.focus = FocusPermission
-		m.pendingPerm = &msg.event
-		m.questionBox = makePermissionQuestionBox(msg.event.Request, min(m.width-10, 60))
-		m.statusText = "Permission requested"
-		return m, nil
-
-	case promptDoneMsg:
-		m.promptRunning = false
-		m.promptCancel = nil
-		m.loading = false
-		if msg.err != nil {
-			m.statusText = "Prompt error: " + msg.err.Error()
-			m.errMsg = msg.err.Error()
-			if m.debug && m.logger != nil {
-				m.logger.Error("prompt done error", "error", msg.err)
-			}
-		} else {
-			m.statusText = "Ready"
-		}
-		return m, nil
-
-	case sessionCreatedMsg:
-		m.loading = false
-		if msg.err != nil {
-			m.statusText = "Session error: " + msg.err.Error()
-			m.errMsg = msg.err.Error()
-			return m, nil
-		}
-		count := len(m.sessions) + 1
-		s := Session{
-			ID:   msg.sessionID,
-			Name: "Session " + formatIntStr2(count),
-			CWD:  client.MustCwd(),
-		}
-		m.sessions = append(m.sessions, s)
-		m.sessionList.Sessions = append(m.sessionList.Sessions, component.SessionItem{
-			ID:     msg.sessionID,
-			Name:   s.Name,
-			Active: true,
-		})
-		for i := range m.sessionList.Sessions {
-			m.sessionList.Sessions[i].Active = (m.sessionList.Sessions[i].ID == msg.sessionID)
-		}
-		m.activeSessionID = msg.sessionID
-		m.messages = nil
-		m.todoList.Items = nil
-		m.statusText = "New session created"
-		return m, nil
-
-	case sessionLoadedMsg:
-		m.loading = false
-		if msg.err != nil {
-			m.statusText = "Load error: " + msg.err.Error()
-			m.errMsg = msg.err.Error()
-			return m, nil
-		}
-		m.statusText = "Session loaded"
-		return m, nil
+	case outputEventMsg:
+		return m.handleOutputEvent(msg.event)
 
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
@@ -194,20 +60,135 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouseMsg(msg)
 	}
 
-	return m, tea.Batch(cmds...)
+	return m, nil
+}
+
+func (m Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
+	if ev.Update != nil {
+		return m.handleSessionUpdate(*ev.Update)
+	}
+
+	switch ev.Kind {
+	case client.EventPromptDone:
+		m.promptRunning = false
+		m.loading = false
+		if ev.Error != nil {
+			m.statusText = "Error: " + ev.Error.Error()
+			m.errMsg = ev.Error.Error()
+		} else {
+			m.statusText = "Ready"
+		}
+		return m, nil
+
+	case client.EventSessionCreated:
+		if ev.Error != nil {
+			m.statusText = "Session error: " + ev.Error.Error()
+			m.errMsg = ev.Error.Error()
+			return m, nil
+		}
+		count := len(m.sessions) + 1
+		s := Session{
+			ID:   ev.SessionID,
+			Name: "Session " + formatIntStr2(count),
+			CWD:  client.MustCwd(),
+		}
+		m.sessions = append(m.sessions, s)
+		m.sessionList.Sessions = append(m.sessionList.Sessions, component.SessionItem{
+			ID:     ev.SessionID,
+			Name:   s.Name,
+			Active: true,
+		})
+		for i := range m.sessionList.Sessions {
+			m.sessionList.Sessions[i].Active = (m.sessionList.Sessions[i].ID == ev.SessionID)
+		}
+		m.activeSessionID = ev.SessionID
+		m.messages = nil
+		m.todoList.Items = nil
+		m.loading = false
+		m.statusText = "New session created"
+		return m, nil
+
+	case client.EventSessionLoaded:
+		if ev.Error != nil {
+			m.statusText = "Load error: " + ev.Error.Error()
+			m.errMsg = ev.Error.Error()
+		} else {
+			m.statusText = "Session loaded"
+		}
+		m.loading = false
+		return m, m.waitForOutput()
+
+	case client.EventPermission:
+		if ev.Permission != nil {
+			m.focus = FocusPermission
+			m.pendingPerm = ev.Permission
+			m.questionBox = makePermissionQuestionBox(ev.Permission.Req, min(m.width-10, 60))
+			m.statusText = "Permission requested"
+		}
+		return m, nil
+
+	case client.EventError:
+		m.errMsg = ev.Error.Error()
+		m.statusText = "Error: " + ev.Error.Error()
+		m.loading = false
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
+	switch {
+	case u.UserMessageChunk != nil:
+		if u.UserMessageChunk.Content.Text != nil {
+			m.addMessage(component.ChatMessage{Role: component.RoleUser, Content: u.UserMessageChunk.Content.Text.Text})
+			m.updateChatViewport()
+		}
+	case u.AgentMessageChunk != nil:
+		if u.AgentMessageChunk.Content.Text != nil {
+			m.appendAgentText(u.AgentMessageChunk.Content.Text.Text)
+			m.updateChatViewport()
+		}
+	case u.ToolCall != nil:
+		tc := u.ToolCall
+		m.addMessage(component.ChatMessage{
+			Role:          component.RoleTool,
+			ToolCallTitle: tc.Title,
+			ToolCallID:    string(tc.ToolCallId),
+			ToolStatus:    string(tc.Status),
+		})
+		m.updateChatViewport()
+	case u.ToolCallUpdate != nil:
+		tu := u.ToolCallUpdate
+		status := ""
+		if tu.Status != nil {
+			status = string(*tu.Status)
+		}
+		m.addMessage(component.ChatMessage{
+			Role:    component.RoleSystem,
+			Content: "Tool " + string(tu.ToolCallId) + " status: " + status,
+		})
+		m.updateChatViewport()
+	case u.Plan != nil:
+		plan := u.Plan
+		for i, entry := range plan.Entries {
+			m.todoList.AddItem(component.TodoItem{
+				ID:     fmt.Sprintf("task-%d", i),
+				Title:  entry.Content,
+				Status: component.TodoPending,
+			})
+		}
+	}
+	return m, m.waitForOutput()
 }
 
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.focus {
 	case FocusPermission:
 		return m.handlePermissionKey(msg)
-
 	case FocusSessionList:
 		return m.handleSessionListKey(msg)
-
 	case FocusCommandPanel:
 		return m.handleCommandPanelKey(msg)
-
 	case FocusInput:
 		return m.handleInputKey(msg)
 	}
@@ -219,15 +200,13 @@ func (m Model) handlePermissionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		m.questionBox.Up()
 		return m, nil
-
 	case "down", "j":
 		m.questionBox.Down()
 		return m, nil
-
 	case "enter", " ":
 		if m.pendingPerm != nil {
 			selectedIdx := m.questionBox.Selected()
-			options := m.pendingPerm.Request.Options
+			options := m.pendingPerm.Req.Options
 			var resp acp.RequestPermissionResponse
 			if selectedIdx >= 0 && selectedIdx < len(options) {
 				resp = acp.RequestPermissionResponse{
@@ -238,17 +217,14 @@ func (m Model) handlePermissionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					},
 				}
 			} else {
-				resp = acp.RequestPermissionResponse{
-					Outcome: acp.RequestPermissionOutcome{},
-				}
+				resp = acp.RequestPermissionResponse{Outcome: acp.RequestPermissionOutcome{}}
 			}
 			m.pendingPerm.Response <- resp
 			m.pendingPerm = nil
 		}
 		m.focus = FocusInput
 		m.statusText = "Ready"
-		return m, m.waitForEvents()
-
+		return m, m.waitForOutput()
 	case "esc":
 		if m.pendingPerm != nil {
 			m.pendingPerm.Response <- acp.RequestPermissionResponse{
@@ -258,8 +234,7 @@ func (m Model) handlePermissionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.focus = FocusInput
 		m.statusText = "Ready"
-		return m, m.waitForEvents()
-
+		return m, m.waitForOutput()
 	case "ctrl+c":
 		if m.pendingPerm != nil {
 			m.pendingPerm.Response <- acp.RequestPermissionResponse{
@@ -278,11 +253,9 @@ func (m Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		m.sessionList.Up()
 		return m, nil
-
 	case "down", "j":
 		m.sessionList.Down()
 		return m, nil
-
 	case "enter":
 		idx := m.sessionList.SelectedIdx
 		if idx >= 0 && idx < len(m.sessionList.Sessions) {
@@ -291,23 +264,26 @@ func (m Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			for i := range m.sessionList.Sessions {
 				m.sessionList.Sessions[i].Active = (m.sessionList.Sessions[i].ID == sess.ID)
 			}
-			for _, s := range m.sessions {
-				if s.ID == sess.ID {
-					m.activeSessionID = s.ID
-					break
-				}
-			}
 			m.statusText = "Loading " + sess.Name + "..."
+			m.focus = FocusInput
+			m.showSessionList = false
+			m.loading = true
+			m.promptRunning = false
+			m.messages = nil
+			m.todoList.Items = nil
+			m.sendInput(client.InputCommand{
+				Type:      client.CmdLoadSession,
+				SessionID: m.activeSessionID,
+			})
+			return m, tea.Batch(m.waitForOutput(), spinnerTick())
 		}
 		m.focus = FocusInput
 		m.showSessionList = false
-		return m, tea.Batch(m.loadSession(m.activeSessionID), m.waitForEvents(), spinnerTick())
-
+		return m, nil
 	case "esc", "ctrl+s":
 		m.showSessionList = false
 		m.focus = FocusInput
 		return m, nil
-
 	case "ctrl+c":
 		m.cleanup()
 		return m, tea.Quit
@@ -322,18 +298,18 @@ func (m Model) handleCommandPanelKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.commandPanelIdx--
 		}
 		return m, nil
-
 	case "down", "j":
 		if m.commandPanelIdx < 2 {
 			m.commandPanelIdx++
 		}
 		return m, nil
-
 	case "enter":
 		switch m.commandPanelIdx {
 		case 0:
 			m.focus = FocusInput
-			return m, m.createSession()
+			m.loading = true
+			m.sendInput(client.InputCommand{Type: client.CmdNewSession})
+			return m, tea.Batch(m.waitForOutput(), spinnerTick())
 		case 1:
 			if len(m.sessions) > 1 {
 				m.showSessionList = true
@@ -348,11 +324,9 @@ func (m Model) handleCommandPanelKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.focus = FocusInput
 		return m, nil
-
 	case "esc", "ctrl+p":
 		m.focus = FocusInput
 		return m, nil
-
 	case "ctrl+c":
 		m.cleanup()
 		return m, tea.Quit
@@ -366,23 +340,34 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		now := time.Now()
 		pasting := !m.lastKeyTime.IsZero() && now.Sub(m.lastKeyTime) < 20*time.Millisecond
 		m.lastKeyTime = now
-
 		if pasting {
 			var cmd tea.Cmd
 			m.textarea, cmd = m.textarea.Update(msg)
 			return m, cmd
 		}
-
 		text := strings.TrimSpace(m.textarea.Value())
 		if text == "" {
 			return m, nil
 		}
 		m.textarea.Reset()
-		return m, tea.Batch(m.submitPrompt(text), spinnerTick())
+		m.addMessage(component.ChatMessage{Role: component.RoleUser, Content: text})
+		m.updateChatViewport()
+		m.promptRunning = true
+		m.loading = true
+		m.errMsg = ""
+		m.statusText = "Processing..."
+		m.sendInput(client.InputCommand{
+			Type:      client.CmdPrompt,
+			SessionID: m.activeSessionID,
+			Text:      text,
+		})
+		return m, tea.Batch(m.waitForOutput(), spinnerTick())
 
 	case "ctrl+n":
 		m.focus = FocusInput
-		return m, m.createSession()
+		m.loading = true
+		m.sendInput(client.InputCommand{Type: client.CmdNewSession})
+		return m, tea.Batch(m.waitForOutput(), spinnerTick())
 
 	case "ctrl+p":
 		m.focus = FocusCommandPanel
@@ -474,20 +459,20 @@ func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				contentLines := strings.Count(m.chatViewport.View(), "\n") + 1
 				m.scrollDragging = true
 				m.scrollDragStartY = msg.Y
-				m.scrollDragStartYOffset = m.chatViewport.YOffset
+				m.scrollDragStartYOff = m.chatViewport.YOffset
 				if contentLines > m.chatViewport.Height && m.chatViewport.Height > 0 {
 					thumbH := max(1, m.chatViewport.Height*m.chatViewport.Height/contentLines)
-					maxOffset := contentLines - m.chatViewport.Height
-					thumbY := m.chatViewport.YOffset * (m.chatViewport.Height - thumbH) / maxOffset
+					maxOff := contentLines - m.chatViewport.Height
+					thumbY := m.chatViewport.YOffset * (m.chatViewport.Height - thumbH) / maxOff
 					if msg.Y < thumbY || msg.Y >= thumbY+thumbH {
-						targetY := msg.Y * maxOffset / (m.chatViewport.Height - thumbH)
-						if targetY < 0 {
-							targetY = 0
+						tY := msg.Y * maxOff / (m.chatViewport.Height - thumbH)
+						if tY < 0 {
+							tY = 0
 						}
-						if targetY > maxOffset {
-							targetY = maxOffset
+						if tY > maxOff {
+							tY = maxOff
 						}
-						m.chatViewport.YOffset = targetY
+						m.chatViewport.YOffset = tY
 					}
 				}
 			} else {
@@ -504,17 +489,17 @@ func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				contentLines := strings.Count(m.chatViewport.View(), "\n") + 1
 				if contentLines > m.chatViewport.Height && m.chatViewport.Height > 0 {
 					thumbH := max(1, m.chatViewport.Height*m.chatViewport.Height/contentLines)
-					maxOffset := contentLines - m.chatViewport.Height
+					maxOff := contentLines - m.chatViewport.Height
 					if m.chatViewport.Height-thumbH > 0 {
-						deltaY := msg.Y - m.scrollDragStartY
-						newOffset := m.scrollDragStartYOffset + deltaY*maxOffset/(m.chatViewport.Height-thumbH)
-						if newOffset < 0 {
-							newOffset = 0
+						dY := msg.Y - m.scrollDragStartY
+						nOff := m.scrollDragStartYOff + dY*maxOff/(m.chatViewport.Height-thumbH)
+						if nOff < 0 {
+							nOff = 0
 						}
-						if newOffset > maxOffset {
-							newOffset = maxOffset
+						if nOff > maxOff {
+							nOff = maxOff
 						}
-						m.chatViewport.YOffset = newOffset
+						m.chatViewport.YOffset = nOff
 					}
 				}
 			}
@@ -534,9 +519,14 @@ func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *Model) updateChatViewport() {
-	m.chatViewport.SetContent(m.renderMessages())
-	m.chatViewport.GotoBottom()
+func (m *Model) waitForOutput() tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-m.outputCh
+		if !ok {
+			return nil
+		}
+		return outputEventMsg{event: ev}
+	}
 }
 
 func formatIntStr2(n int) string {

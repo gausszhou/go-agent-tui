@@ -36,37 +36,15 @@ type spinnerTickMsg struct {
 	time time.Time
 }
 
-type acpEventMsg struct {
-	event client.AcpEvent
-}
-
-type permEventMsg struct {
-	event client.PermissionEvent
-}
-
-type initConnMsg struct {
-	conn    *acp.ClientSideConnection
-	cmd     *exec.Cmd
-	acpClient *client.ACPClient
-	err     error
+type outputEventMsg struct {
+	event client.OutputEvent
 }
 
 type initDoneMsg struct {
-	sessionID  string
-	err        error
-}
-
-type promptDoneMsg struct {
-	err error
-}
-
-type sessionCreatedMsg struct {
 	sessionID string
 	err       error
-}
-
-type sessionLoadedMsg struct {
-	err error
+	acpClient *client.ACPClient
+	cmd       *exec.Cmd
 }
 
 type Model struct {
@@ -75,18 +53,17 @@ type Model struct {
 	debug  bool
 	logger *slog.Logger
 
-	acpEventCh  chan client.AcpEvent
-	permEventCh chan client.PermissionEvent
+	inputCh  chan client.InputCommand
+	outputCh chan client.OutputEvent
 
 	acpClient *client.ACPClient
-	conn      *acp.ClientSideConnection
 	cmd       *exec.Cmd
 	ctx       context.Context
 	cancel    context.CancelFunc
 
 	focus FocusArea
 
-	pendingPerm *client.PermissionEvent
+	pendingPerm *client.PermissionRequest
 	questionBox component.QuestionBox
 
 	messages []component.ChatMessage
@@ -96,31 +73,30 @@ type Model struct {
 	spinner component.Loading
 	loading bool
 
-	sessions          []Session
-	activeSessionID   string
-	sessionList       component.SessionList
-	showSessionList   bool
+	sessions        []Session
+	activeSessionID string
+	sessionList     component.SessionList
+	showSessionList bool
 
 	usageInfo component.UsageInfo
 	todoList  component.TodoList
 	statusBar component.StatusBar
 
-	showHelp     bool
 	commandPanelIdx int
 
 	chatViewport viewport.Model
 
-	promptCancel context.CancelFunc
 	promptRunning bool
 
-	errMsg      string
-	statusText  string
-	lastKeyTime time.Time
-	lastEscTime time.Time
-	viewportFocused  bool
-	scrollDragging   bool
-	scrollDragStartY int
-	scrollDragStartYOffset int
+	errMsg     string
+	statusText string
+
+	lastKeyTime         time.Time
+	lastEscTime         time.Time
+	viewportFocused     bool
+	scrollDragging      bool
+	scrollDragStartY    int
+	scrollDragStartYOff int
 }
 
 func NewModel(debug bool, logger *slog.Logger) Model {
@@ -137,17 +113,18 @@ func NewModel(debug bool, logger *slog.Logger) Model {
 
 	vp := viewport.New(80, 20)
 
+	inCh := make(chan client.InputCommand, 100)
+	outCh := make(chan client.OutputEvent, 100)
+
 	return Model{
 		debug:  debug,
 		logger: logger,
 
 		ctx:    ctx,
 		cancel: cancel,
-		conn:   nil,
-		cmd:    nil,
 
-		acpEventCh:  make(chan client.AcpEvent, 100),
-		permEventCh: make(chan client.PermissionEvent, 10),
+		inputCh:  inCh,
+		outputCh: outCh,
 
 		focus: FocusInput,
 
@@ -155,12 +132,12 @@ func NewModel(debug bool, logger *slog.Logger) Model {
 		spinner:  component.NewLoading(loadingSpinner()),
 		loading:  true,
 
-		sessions:       []Session{},
-		sessionList:    component.NewSessionList("Sessions"),
-		usageInfo:      component.NewUsageInfo(),
-		todoList:       component.NewTodoList("Tasks"),
-		statusBar:      component.NewStatusBar(),
-		chatViewport:   vp,
+		sessions:     []Session{},
+		sessionList:  component.NewSessionList("Sessions"),
+		usageInfo:    component.NewUsageInfo(),
+		todoList:     component.NewTodoList("Tasks"),
+		statusBar:    component.NewStatusBar(),
+		chatViewport: vp,
 
 		statusText: "Connecting...",
 	}
@@ -169,56 +146,61 @@ func NewModel(debug bool, logger *slog.Logger) Model {
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		func() tea.Msg {
-			cmd := exec.CommandContext(m.ctx, "opencode", "acp")
-			acpClient := client.NewClient(m.acpEventCh, m.permEventCh)
-			acpClient.Logger = m.logger
-			acpClient.SetDebug(m.debug)
+			in := m.inputCh
+			out := m.outputCh
+			acpClient := client.NewClient(in, out, nil)
 
 			if m.debug && m.logger != nil {
-				m.logger.Info("starting agent process", "cmd", cmd.String())
+				m.logger.Info("starting agent process")
 			}
 
+			cmd := exec.CommandContext(m.ctx, "opencode", "acp")
 			conn, err := client.NewConnection(cmd, acpClient, m.logger)
 			if err != nil {
-				return initConnMsg{err: err}
+				return initDoneMsg{err: err}
 			}
-			return initConnMsg{conn: conn, cmd: cmd, acpClient: acpClient}
+
+			initResp, err := conn.Initialize(m.ctx, acp.InitializeRequest{
+				ProtocolVersion: acp.ProtocolVersionNumber,
+				ClientCapabilities: acp.ClientCapabilities{
+					Fs:       acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
+					Terminal: true,
+				},
+			})
+			if err != nil {
+				return initDoneMsg{err: err}
+			}
+			if m.debug && m.logger != nil {
+				m.logger.Info("agent initialized", "protocol_version", initResp.ProtocolVersion)
+			}
+
+			newSess, err := conn.NewSession(m.ctx, acp.NewSessionRequest{
+				Cwd:        client.MustCwd(),
+				McpServers: []acp.McpServer{},
+			})
+			if err != nil {
+				return initDoneMsg{err: err}
+			}
+			if m.debug && m.logger != nil {
+				m.logger.Info("session created", "session_id", newSess.SessionId)
+			}
+
+			go acpClient.Run(m.ctx, conn)
+
+			return initDoneMsg{
+				sessionID: string(newSess.SessionId),
+				acpClient: acpClient,
+				cmd:       cmd,
+			}
 		},
 		spinnerTick(),
 	)
 }
 
-func (m *Model) doInitialize(conn *acp.ClientSideConnection, acpClient *client.ACPClient) tea.Cmd {
-	m.conn = conn
-	m.acpClient = acpClient
-
-	return func() tea.Msg {
-		initResp, err := m.conn.Initialize(m.ctx, acp.InitializeRequest{
-			ProtocolVersion: acp.ProtocolVersionNumber,
-			ClientCapabilities: acp.ClientCapabilities{
-				Fs:       acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
-				Terminal: true,
-			},
-		})
-		if err != nil {
-			return initDoneMsg{err: err}
-		}
-		if m.debug && m.logger != nil {
-			m.logger.Info("agent initialized", "protocol_version", initResp.ProtocolVersion)
-		}
-
-		newSess, err := m.conn.NewSession(m.ctx, acp.NewSessionRequest{
-			Cwd:        client.MustCwd(),
-			McpServers: []acp.McpServer{},
-		})
-		if err != nil {
-			return initDoneMsg{err: err}
-		}
-		if m.debug && m.logger != nil {
-			m.logger.Info("session created", "session_id", newSess.SessionId)
-		}
-
-		return initDoneMsg{sessionID: string(newSess.SessionId)}
+func (m *Model) sendInput(cmd client.InputCommand) {
+	select {
+	case m.inputCh <- cmd:
+	default:
 	}
 }
 
@@ -237,101 +219,6 @@ func (m *Model) addMessage(msg component.ChatMessage) {
 	m.messages = append(m.messages, msg)
 }
 
-func (m *Model) submitPrompt(text string) tea.Cmd {
-	m.addMessage(component.ChatMessage{Role: component.RoleUser, Content: text})
-	m.updateChatViewport()
-
-	sessionID := m.activeSessionID
-	ctx, cancel := context.WithCancel(m.ctx)
-	m.promptCancel = cancel
-	m.promptRunning = true
-	m.loading = true
-	m.errMsg = ""
-	m.statusText = "Processing..."
-
-	if m.debug && m.logger != nil {
-		m.logger.Info("submitting prompt", "session", sessionID, "text", text)
-	}
-
-	return tea.Batch(
-		func() tea.Msg {
-			_, err := m.conn.Prompt(ctx, acp.PromptRequest{
-				SessionId: acp.SessionId(sessionID),
-				Prompt:    []acp.ContentBlock{acp.TextBlock(text)},
-			})
-			return promptDoneMsg{err: err}
-		},
-		m.waitForEvents(),
-		spinnerTick(),
-	)
-}
-
-func (m *Model) createSession() tea.Cmd {
-	m.loading = true
-	m.statusText = "Creating session..."
-	return func() tea.Msg {
-		newSess, err := m.conn.NewSession(m.ctx, acp.NewSessionRequest{
-			Cwd:        client.MustCwd(),
-			McpServers: []acp.McpServer{},
-		})
-		if err != nil {
-			return sessionCreatedMsg{err: err}
-		}
-		return sessionCreatedMsg{sessionID: string(newSess.SessionId)}
-	}
-}
-
-func (m *Model) loadSession(sessionID string) tea.Cmd {
-	m.messages = nil
-	m.todoList.Items = nil
-	m.loading = true
-	m.statusText = "Loading session..."
-	return func() tea.Msg {
-		_, err := m.conn.LoadSession(m.ctx, acp.LoadSessionRequest{
-			SessionId: acp.SessionId(sessionID),
-			Cwd:       client.MustCwd(),
-			McpServers: []acp.McpServer{},
-		})
-		return sessionLoadedMsg{err: err}
-	}
-}
-
-func (m *Model) waitForEvents() tea.Cmd {
-	return func() tea.Msg {
-		select {
-		case evt, ok := <-m.acpEventCh:
-			if !ok {
-				return nil
-			}
-			return acpEventMsg{event: evt}
-		case evt, ok := <-m.permEventCh:
-			if !ok {
-				return nil
-			}
-			return permEventMsg{event: evt}
-		}
-	}
-}
-
-func (m *Model) interruptPrompt() {
-	if m.promptCancel != nil {
-		m.promptCancel()
-		m.promptCancel = nil
-		m.statusText = "Interrupted"
-	}
-}
-
-func (m *Model) cleanup() {
-	if m.promptCancel != nil {
-		m.promptCancel()
-		m.promptCancel = nil
-	}
-	if m.cmd != nil && m.cmd.Process != nil {
-		_ = m.cmd.Process.Kill()
-	}
-	m.cancel()
-}
-
 func (m *Model) renderMessages() string {
 	var sb strings.Builder
 	for _, msg := range m.messages {
@@ -339,6 +226,24 @@ func (m *Model) renderMessages() string {
 		sb.WriteString("\n")
 	}
 	return sb.String()
+}
+
+func (m *Model) updateChatViewport() {
+	m.chatViewport.SetContent(m.renderMessages())
+	m.chatViewport.GotoBottom()
+}
+
+func (m *Model) interruptPrompt() {
+	m.sendInput(client.InputCommand{Type: client.CmdInterrupt})
+	m.statusText = "Interrupted"
+}
+
+func (m *Model) cleanup() {
+	m.interruptPrompt()
+	if m.cmd != nil && m.cmd.Process != nil {
+		_ = m.cmd.Process.Kill()
+	}
+	m.cancel()
 }
 
 func spinnerTick() tea.Cmd {

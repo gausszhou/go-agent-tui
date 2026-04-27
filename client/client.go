@@ -12,55 +12,100 @@ import (
 	"github.com/coder/acp-go-sdk"
 )
 
-type PermissionEvent struct {
-	Request  acp.RequestPermissionRequest
+type CommandType int
+
+const (
+	CmdPrompt   CommandType = iota
+	CmdInterrupt
+	CmdNewSession
+	CmdLoadSession
+)
+
+type InputCommand struct {
+	Type      CommandType
+	SessionID string
+	Text      string
+	CWD       string
+}
+
+type EventKind int
+
+const (
+	EventPromptDone     EventKind = iota
+	EventSessionCreated
+	EventSessionLoaded
+	EventPermission
+	EventError
+)
+
+type PermissionRequest struct {
+	Req      acp.RequestPermissionRequest
 	Response chan<- acp.RequestPermissionResponse
 }
 
-type AcpEventKind int
-
-const (
-	AcpUserChunk  AcpEventKind = iota
-	AcpAgentChunk
-	AcpToolCall
-	AcpToolUpdate
-	AcpPlan
-	AcpPromptDone
-	AcpError
-)
-
-type AcpEvent struct {
-	Kind       AcpEventKind
-	Text       string
-	ToolCall   *acp.SessionUpdateToolCall
-	ToolUpdate *acp.SessionToolCallUpdate
-	Plan       *acp.SessionUpdatePlan
+type OutputEvent struct {
+	Kind       EventKind
+	Update     *acp.SessionUpdate
+	Permission *PermissionRequest
+	SessionID  string
 	Error      error
 }
 
 type ACPClient struct {
-	eventCh  chan<- AcpEvent
-	permCh   chan<- PermissionEvent
-	debug    bool
-	Logger   *slog.Logger
+	inputCh  <-chan InputCommand
+	outputCh chan<- OutputEvent
+	signalCh chan<- interface{}
 }
 
 var _ acp.Client = (*ACPClient)(nil)
 
-func NewClient(eventCh chan<- AcpEvent, permCh chan<- PermissionEvent) *ACPClient {
+func NewClient(inputCh <-chan InputCommand, outputCh chan<- OutputEvent, signalCh chan<- interface{}) *ACPClient {
 	return &ACPClient{
-		eventCh: eventCh,
-		permCh:  permCh,
+		inputCh:  inputCh,
+		outputCh: outputCh,
+		signalCh: signalCh,
 	}
 }
 
-func (c *ACPClient) SetDebug(debug bool) {
-	c.debug = debug
+func (c *ACPClient) Run(ctx context.Context, conn *acp.ClientSideConnection) {
+	var promptCancel context.CancelFunc
+
+	for {
+		select {
+		case cmd, ok := <-c.inputCh:
+			if !ok {
+				return
+			}
+			switch cmd.Type {
+			case CmdPrompt:
+				pCtx, cancel := context.WithCancel(ctx)
+				promptCancel = cancel
+				go doPrompt(pCtx, conn, c.outputCh, cmd)
+			case CmdInterrupt:
+				if promptCancel != nil {
+					promptCancel()
+					promptCancel = nil
+				}
+			case CmdNewSession:
+				go doNewSession(ctx, conn, c.outputCh, cmd)
+			case CmdLoadSession:
+				go doLoadSession(ctx, conn, c.outputCh, cmd)
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (c *ACPClient) RequestPermission(ctx context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
 	respCh := make(chan acp.RequestPermissionResponse, 1)
-	c.permCh <- PermissionEvent{Request: params, Response: respCh}
+	c.outputCh <- OutputEvent{
+		Kind: EventPermission,
+		Permission: &PermissionRequest{
+			Req:      params,
+			Response: respCh,
+		},
+	}
 	select {
 	case resp := <-respCh:
 		return resp, nil
@@ -70,29 +115,7 @@ func (c *ACPClient) RequestPermission(ctx context.Context, params acp.RequestPer
 }
 
 func (c *ACPClient) SessionUpdate(ctx context.Context, params acp.SessionNotification) error {
-	u := params.Update
-	switch {
-	case u.UserMessageChunk != nil:
-		content := u.UserMessageChunk.Content
-		if content.Text != nil {
-			c.eventCh <- AcpEvent{Kind: AcpUserChunk, Text: content.Text.Text}
-		}
-	case u.AgentMessageChunk != nil:
-		content := u.AgentMessageChunk.Content
-		if content.Text != nil {
-			c.eventCh <- AcpEvent{Kind: AcpAgentChunk, Text: content.Text.Text}
-		}
-	case u.ToolCall != nil:
-		c.eventCh <- AcpEvent{Kind: AcpToolCall, ToolCall: u.ToolCall}
-	case u.ToolCallUpdate != nil:
-		c.eventCh <- AcpEvent{Kind: AcpToolUpdate, ToolUpdate: u.ToolCallUpdate}
-	case u.Plan != nil:
-		c.eventCh <- AcpEvent{Kind: AcpPlan, Plan: u.Plan}
-	default:
-		if c.debug && c.Logger != nil {
-			c.Logger.Debug("unhandled update kind", "update", u)
-		}
-	}
+	c.outputCh <- OutputEvent{Update: &params.Update}
 	return nil
 }
 
@@ -108,9 +131,6 @@ func (c *ACPClient) WriteTextFile(ctx context.Context, params acp.WriteTextFileR
 	}
 	if err := os.WriteFile(params.Path, []byte(params.Content), 0o644); err != nil {
 		return acp.WriteTextFileResponse{}, fmt.Errorf("write %s: %w", params.Path, err)
-	}
-	if c.debug && c.Logger != nil {
-		c.Logger.Debug("WriteTextFile", "path", params.Path, "bytes", len(params.Content))
 	}
 	return acp.WriteTextFileResponse{}, nil
 }
@@ -138,16 +158,10 @@ func (c *ACPClient) ReadTextFile(ctx context.Context, params acp.ReadTextFileReq
 		}
 		content = strings.Join(lines[start:end], "\n")
 	}
-	if c.debug && c.Logger != nil {
-		c.Logger.Debug("ReadTextFile", "path", params.Path, "bytes", len(content))
-	}
 	return acp.ReadTextFileResponse{Content: content}, nil
 }
 
 func (c *ACPClient) CreateTerminal(ctx context.Context, params acp.CreateTerminalRequest) (acp.CreateTerminalResponse, error) {
-	if c.debug && c.Logger != nil {
-		c.Logger.Debug("CreateTerminal", "params", params)
-	}
 	return acp.CreateTerminalResponse{TerminalId: "term-1"}, nil
 }
 
@@ -191,4 +205,41 @@ func MustCwd() string {
 		return "."
 	}
 	return wd
+}
+
+func doPrompt(ctx context.Context, conn *acp.ClientSideConnection, outputCh chan<- OutputEvent, cmd InputCommand) {
+	_, err := conn.Prompt(ctx, acp.PromptRequest{
+		SessionId: acp.SessionId(cmd.SessionID),
+		Prompt:    []acp.ContentBlock{acp.TextBlock(cmd.Text)},
+	})
+	outputCh <- OutputEvent{Kind: EventPromptDone, Error: err}
+}
+
+func doNewSession(ctx context.Context, conn *acp.ClientSideConnection, outputCh chan<- OutputEvent, cmd InputCommand) {
+	cwd := cmd.CWD
+	if cwd == "" {
+		cwd = MustCwd()
+	}
+	newSess, err := conn.NewSession(ctx, acp.NewSessionRequest{
+		Cwd:        cwd,
+		McpServers: []acp.McpServer{},
+	})
+	if err != nil {
+		outputCh <- OutputEvent{Kind: EventSessionCreated, Error: err}
+		return
+	}
+	outputCh <- OutputEvent{Kind: EventSessionCreated, SessionID: string(newSess.SessionId)}
+}
+
+func doLoadSession(ctx context.Context, conn *acp.ClientSideConnection, outputCh chan<- OutputEvent, cmd InputCommand) {
+	cwd := cmd.CWD
+	if cwd == "" {
+		cwd = MustCwd()
+	}
+	_, err := conn.LoadSession(ctx, acp.LoadSessionRequest{
+		SessionId: acp.SessionId(cmd.SessionID),
+		Cwd:       cwd,
+		McpServers: []acp.McpServer{},
+	})
+	outputCh <- OutputEvent{Kind: EventSessionLoaded, Error: err}
 }

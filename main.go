@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	tea "github.com/charmbracelet/bubbletea"
 	acpsdk "github.com/coder/acp-go-sdk"
@@ -95,12 +94,7 @@ func setupLogger(debug bool) *slog.Logger {
 		return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	}
 
-	logDir := logDir()
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
-		return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	}
-
-	logPath := filepath.Join(logDir, "go-agent-tui.log")
+	logPath := filepath.Join(".", "go-agent-tui.log")
 	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -108,21 +102,4 @@ func setupLogger(debug bool) *slog.Logger {
 
 	fmt.Fprintf(os.Stderr, "[debug] Logging to %s\n", logPath)
 	return slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{Level: slog.LevelDebug}))
-}
-
-func logDir() string {
-	switch runtime.GOOS {
-	case "windows":
-		dir := os.Getenv("LOCALAPPDATA")
-		if dir == "" {
-			dir = os.Getenv("APPDATA")
-		}
-		if dir == "" {
-			dir, _ = os.UserHomeDir()
-		}
-		return filepath.Join(dir, "go-agent-tui")
-	default:
-		dir, _ := os.UserHomeDir()
-		return filepath.Join(dir, ".local", "share", "go-agent-tui")
-	}
 }

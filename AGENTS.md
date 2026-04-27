@@ -13,7 +13,7 @@ go build -o agent.exe ./agent         # standalone example agent
 
 ```bash
 go run .                              # requires `opencode` in PATH
-go run . --debug                      # log to ~/.local/share/go-agent-tui/ (or %LOCALAPPDATA% on Windows)
+go run . --debug                      # log to ./go-agent-tui.log in current directory
 go run ./agent                        # example agent, connects via stdio
 ```
 

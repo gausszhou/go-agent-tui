@@ -47,11 +47,10 @@ func (m Model) renderLeft(width, chatH int) string {
 
 	m.chatViewport.Width = vpW
 	m.chatViewport.Height = chatH
-	content := m.renderMessages()
-	m.chatViewport.SetContent(content)
 	vp := m.chatViewport.View()
 
-	sb := renderScrollbar(chatH, strings.Count(content, "\n")+1, m.chatViewport.YOffset)
+	contentLines := visibleLineCount(m.chatViewport.View())
+	sb := renderScrollbar(chatH, contentLines, m.chatViewport.YOffset)
 	chat := lipgloss.JoinHorizontal(lipgloss.Top, vp, sb)
 
 	input := m.renderInput(width)
@@ -172,6 +171,13 @@ func (m Model) renderCommandPanelOverlay() string {
 
 	content := sb.String()
 	return overlayBox().Width(30).Render(content)
+}
+
+func visibleLineCount(s string) int {
+	if s == "" {
+		return 0
+	}
+	return strings.Count(strings.TrimRight(s, "\n"), "\n") + 1
 }
 
 func renderScrollbar(height, totalLines, yOffset int) string {

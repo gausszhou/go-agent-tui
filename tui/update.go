@@ -128,7 +128,7 @@ func (m Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
 func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 	switch {
 	case u.UserMessageChunk != nil:
-		if u.UserMessageChunk.Content.Text != nil {
+		if u.UserMessageChunk.Content.Text != nil && !m.promptRunning {
 			m.addMessage(component.ChatMessage{Role: component.RoleUser, Content: u.UserMessageChunk.Content.Text.Text})
 			m.viewportDirty = true
 		}
@@ -449,7 +449,7 @@ func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		switch msg.Action {
 		case tea.MouseActionPress:
 			if msg.X == barX && msg.Y >= 0 && msg.Y < m.chatViewport.Height {
-				contentLines := strings.Count(m.chatViewport.View(), "\n") + 1
+				contentLines := visibleLineCount(m.chatViewport.View())
 				m.scrollDragging = true
 				m.scrollDragStartY = msg.Y
 				m.scrollDragStartYOff = m.chatViewport.YOffset
@@ -479,7 +479,7 @@ func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 		case tea.MouseActionMotion:
 			if m.scrollDragging && msg.X >= barX-2 && msg.X <= barX+2 {
-				contentLines := strings.Count(m.chatViewport.View(), "\n") + 1
+				contentLines := visibleLineCount(m.chatViewport.View())
 				if contentLines > m.chatViewport.Height && m.chatViewport.Height > 0 {
 					thumbH := max(1, m.chatViewport.Height*m.chatViewport.Height/contentLines)
 					maxOff := contentLines - m.chatViewport.Height

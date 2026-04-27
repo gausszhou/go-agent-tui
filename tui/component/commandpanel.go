@@ -40,11 +40,12 @@ func (cp CommandPanel) View() string {
 
 func DefaultCommands() CommandPanel {
 	return NewCommandPanel([]Command{
-		{Key: "Ctrl+C", Desc: "Quit"},
-		{Key: "Ctrl+E", Desc: "Send"},
+		{Key: "Enter", Desc: "Send"},
+		{Key: "Shift+Enter", Desc: "Newline"},
 		{Key: "Ctrl+N", Desc: "New Session"},
 		{Key: "Ctrl+S", Desc: "Switch Session"},
 		{Key: "Ctrl+I", Desc: "Interrupt"},
 		{Key: "Ctrl+H", Desc: "Help"},
+		{Key: "Ctrl+C", Desc: "Quit"},
 	})
 }

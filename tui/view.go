@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 
+	overlay "github.com/rmhubbert/bubbletea-overlay"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -11,48 +12,43 @@ func (m Model) View() string {
 		return "Initializing..."
 	}
 
-	leftWidth := m.width * 70 / 100
-	rightWidth := m.width - leftWidth - 1
-	if rightWidth < 24 {
-		rightWidth = 24
-		leftWidth = m.width - rightWidth - 1
-	}
-
-	chatHeight := m.height - 5
-	if m.showHelp {
-		chatHeight -= 1
-	}
-
-	leftPanel := m.renderLeftPanel(leftWidth, chatHeight)
-	rightPanel := m.renderRightPanel(rightWidth)
-
-	sep := divider().Render("│")
-
-	fullView := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, sep, rightPanel)
-	bgView := base().Width(m.width).Height(m.height).Render(fullView)
+	bg := m.renderMainView()
 
 	if m.focus == FocusPermission {
-		overlay := m.renderPermissionOverlay()
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-			overlay,
-			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceForeground(ocBg),
-		)
+		fg := m.renderPermissionOverlay()
+		return overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0)
 	}
 
-	return bgView
+	return bg
 }
 
-func (m Model) renderLeftPanel(width, chatHeight int) string {
+func (m Model) renderMainView() string {
+	leftW := m.width * 68 / 100
+	rightW := m.width - leftW - 1
+	if rightW < 22 {
+		rightW = 22
+		leftW = m.width - rightW - 1
+	}
+	chatH := m.height - 4
+	if m.showHelp {
+		chatH--
+	}
+
+	left := m.renderLeft(leftW, chatH)
+	right := m.renderRight(rightW)
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, divider().Render("│"), right)
+}
+
+func (m Model) renderLeft(width, chatH int) string {
 	m.chatViewport.Width = width
-	m.chatViewport.Height = chatHeight
+	m.chatViewport.Height = chatH
+	m.chatViewport.SetContent(m.renderMessages())
+	m.chatViewport.GotoBottom()
 
-	chatBox := panelTopBorder("Chat").
-		Width(width).
-		Height(chatHeight + 2).
-		Render(m.chatViewport.View())
+	chat := m.chatViewport.View()
 
-	inputArea := m.renderInputArea(width)
+	input := m.renderInput(width)
 
 	helpLine := ""
 	if m.showHelp {
@@ -62,29 +58,41 @@ func (m Model) renderLeftPanel(width, chatHeight int) string {
 	m.statusBar.Width = width
 	m.statusBar.Loading = m.loading
 	m.statusBar.Status = m.statusText
-	m.statusBar.Help = "Ctrl+E Send  Ctrl+N Session  Ctrl+S Switch  Ctrl+I Stop  Ctrl+H Help  Ctrl+C Quit"
+	m.statusBar.Help = "Enter Send  Ctrl+S Switch  Ctrl+N New  Ctrl+I Stop  Ctrl+C Quit"
 	m.statusBar.Style = statusBarBg()
 	status := m.statusBar.View()
 
-	return lipgloss.JoinVertical(lipgloss.Left, chatBox, inputArea, helpLine, status)
+	return lipgloss.JoinVertical(lipgloss.Left, chat, input, helpLine, status)
 }
 
-func (m Model) renderRightPanel(width int) string {
-	margin := lipgloss.NewStyle().Width(width)
+func (m Model) renderRight(width int) string {
+	var parts []string
 
-	usageBox := panelBorder().Width(width).Render(m.usageInfo.View())
-	usageBox = margin.Render(usageBox)
+	usage := base().
+		BorderTop(true).BorderStyle(lipgloss.NormalBorder()).
+		BorderTopForeground(border()).
+		Width(width).Padding(0, 1).
+		Render(m.usageInfo.View())
+	parts = append(parts, usage)
 
-	taskBox := panelBorder().Width(width).Render(m.todoList.View())
-	taskBox = margin.Render(taskBox)
+	tasks := base().
+		BorderTop(true).BorderStyle(lipgloss.NormalBorder()).
+		BorderTopForeground(border()).
+		Width(width).Padding(0, 1).
+		Render(m.todoList.View())
+	parts = append(parts, tasks)
 
-	sessionBox := panelBorder().Width(width).Render(m.sessionList.View())
-	sessionBox = margin.Render(sessionBox)
+	sess := base().
+		BorderTop(true).BorderStyle(lipgloss.NormalBorder()).
+		BorderTopForeground(border()).
+		Width(width).Padding(0, 1).
+		Render(m.sessionList.View())
+	parts = append(parts, sess)
 
-	return lipgloss.JoinVertical(lipgloss.Top, usageBox, taskBox, sessionBox)
+	return lipgloss.JoinVertical(lipgloss.Top, parts...)
 }
 
-func (m Model) renderInputArea(width int) string {
+func (m Model) renderInput(width int) string {
 	m.textarea.SetWidth(width - 2)
 
 	var sb strings.Builder
@@ -92,8 +100,8 @@ func (m Model) renderInputArea(width int) string {
 		sb.WriteString(errorText().Width(width).Render("! " + m.errMsg))
 		sb.WriteString("\n")
 	}
-	isFocused := m.focus == FocusInput
-	if isFocused {
+
+	if m.focus == FocusInput {
 		sb.WriteString(inputBoxFocused().Width(width).Render(m.textarea.View()))
 	} else {
 		sb.WriteString(inputBox().Width(width).Render(m.textarea.View()))
@@ -121,11 +129,11 @@ func (m Model) renderPermissionOverlay() string {
 
 	help := helpLabel().Render("↑↓ navigate  Enter select  Esc deny  Ctrl+C quit")
 
-	overlayContent := lipgloss.JoinVertical(lipgloss.Left,
+	ov := lipgloss.JoinVertical(lipgloss.Left,
 		spinner+content,
 		"",
 		help,
 	)
 
-	return overlayBox().MaxWidth(m.width - 10).Render(overlayContent)
+	return overlayBox().MaxWidth(m.width - 10).Render(ov)
 }

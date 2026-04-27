@@ -302,14 +302,13 @@ func (m Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+e":
+	case "enter", "ctrl+e":
 		text := strings.TrimSpace(m.textarea.Value())
 		if text == "" {
 			return m, nil
 		}
 		m.textarea.Reset()
-		cmds := []tea.Cmd{m.submitPrompt(text)}
-		return m, tea.Batch(cmds...)
+		return m, tea.Batch(m.submitPrompt(text), spinnerTick())
 
 	case "ctrl+n":
 		m.focus = FocusInput

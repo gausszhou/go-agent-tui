@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/coder/acp-go-sdk"
@@ -115,13 +116,13 @@ func NewModel(debug bool, logger *slog.Logger) Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ta := textarea.New()
-	ta.Placeholder = "Type a message... (Ctrl+E to send)"
+	ta.Placeholder = "Type a message... (Enter to send, Shift+Enter for newline)"
 	ta.SetWidth(80)
 	ta.SetHeight(3)
 	ta.Focus()
 	ta.CharLimit = 0
 	ta.ShowLineNumbers = false
-	ta.KeyMap.InsertNewline.SetEnabled(true)
+	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter"))
 
 	vp := viewport.New(80, 20)
 

@@ -125,6 +125,17 @@ func (m Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func mapPlanStatus(s acp.PlanEntryStatus) component.TodoStatus {
+	switch s {
+	case acp.PlanEntryStatusInProgress:
+		return component.TodoInProgress
+	case acp.PlanEntryStatusCompleted:
+		return component.TodoCompleted
+	default:
+		return component.TodoPending
+	}
+}
+
 func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 	switch {
 	case u.UserMessageChunk != nil:
@@ -137,6 +148,15 @@ func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 		m.logger.Debug("session update: agent message chunk")
 		if u.AgentMessageChunk.Content.Text != nil {
 			m.appendAgentText(u.AgentMessageChunk.Content.Text.Text)
+			m.viewportDirty = true
+		}
+	case u.AgentThoughtChunk != nil:
+		m.logger.Debug("session update: agent thought chunk")
+		if u.AgentThoughtChunk.Content.Text != nil {
+			m.addMessage(component.ChatMessage{
+				Role:    component.RoleThought,
+				Content: u.AgentThoughtChunk.Content.Text.Text,
+			})
 			m.viewportDirty = true
 		}
 	case u.ToolCall != nil:
@@ -163,15 +183,54 @@ func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 		m.viewportDirty = true
 	case u.Plan != nil:
 		m.logger.Debug("session update: plan", "entries", len(u.Plan.Entries))
-		plan := u.Plan
-		for i, entry := range plan.Entries {
+		m.todoList.Items = nil
+		for i, entry := range u.Plan.Entries {
 			m.todoList.AddItem(component.TodoItem{
 				ID:     fmt.Sprintf("task-%d", i),
 				Title:  entry.Content,
-				Status: component.TodoPending,
+				Status: mapPlanStatus(entry.Status),
 			})
 		}
 		m.viewportDirty = true
+	case u.AvailableCommandsUpdate != nil:
+		cmds := u.AvailableCommandsUpdate.AvailableCommands
+		m.logger.Debug("session update: available commands", "count", len(cmds))
+		for _, c := range cmds {
+			m.logger.Debug("  command", "name", c.Name, "description", c.Description)
+		}
+	case u.CurrentModeUpdate != nil:
+		modeID := u.CurrentModeUpdate.CurrentModeId
+		m.logger.Debug("session update: current mode", "mode", string(modeID))
+		m.statusText = "Mode: " + string(modeID)
+	case u.ConfigOptionUpdate != nil:
+		opts := u.ConfigOptionUpdate.ConfigOptions
+		m.logger.Debug("session update: config options", "count", len(opts))
+	case u.SessionInfoUpdate != nil:
+		info := u.SessionInfoUpdate
+		m.logger.Debug("session update: session info")
+		if info.Title != nil {
+			for i := range m.sessions {
+				if m.sessions[i].ID == m.activeSessionID {
+					m.sessions[i].Name = *info.Title
+					break
+				}
+			}
+			for i := range m.sessionList.Sessions {
+				if m.sessionList.Sessions[i].ID == m.activeSessionID {
+					m.sessionList.Sessions[i].Name = *info.Title
+					break
+				}
+			}
+		}
+	case u.UsageUpdate != nil:
+		usage := u.UsageUpdate
+		m.logger.Debug("session update: usage",
+			"used", usage.Used,
+			"size", usage.Size,
+		)
+		if usage.Cost != nil {
+			m.logger.Debug("  cost", "amount", usage.Cost.Amount, "currency", usage.Cost.Currency)
+		}
 	default:
 		m.logger.Debug("session update: unknown type")
 	}
@@ -447,7 +506,7 @@ func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		switch msg.Action {
 		case tea.MouseActionPress:
 			if msg.X == barX && msg.Y >= 0 && msg.Y < m.chatViewport.Height {
-				contentLines := visibleLineCount(m.chatViewport.View())
+				contentLines := m.chatViewport.TotalLineCount()
 				m.scrollDragging = true
 				m.scrollDragStartY = msg.Y
 				m.scrollDragStartYOff = m.chatViewport.YOffset
@@ -477,7 +536,7 @@ func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 		case tea.MouseActionMotion:
 			if m.scrollDragging && msg.X >= barX-2 && msg.X <= barX+2 {
-				contentLines := visibleLineCount(m.chatViewport.View())
+				contentLines := m.chatViewport.TotalLineCount()
 				if contentLines > m.chatViewport.Height && m.chatViewport.Height > 0 {
 					thumbH := max(1, m.chatViewport.Height*m.chatViewport.Height/contentLines)
 					maxOff := contentLines - m.chatViewport.Height

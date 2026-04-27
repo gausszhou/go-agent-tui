@@ -12,6 +12,7 @@ type MessageRole int
 const (
 	RoleUser MessageRole = iota
 	RoleAgent
+	RoleThought
 	RoleSystem
 	RoleTool
 )
@@ -24,7 +25,7 @@ type ChatMessage struct {
 	ToolStatus    string
 }
 
-func (m ChatMessage) Render(width int, userStyle, agentStyle, toolStyle, systemStyle lipgloss.Style) string {
+func (m ChatMessage) Render(width int, userStyle, agentStyle, thoughtStyle, toolStyle, systemStyle lipgloss.Style) string {
 	prefix := ""
 	var style lipgloss.Style
 
@@ -35,6 +36,9 @@ func (m ChatMessage) Render(width int, userStyle, agentStyle, toolStyle, systemS
 	case RoleAgent:
 		prefix = "Agent"
 		style = agentStyle
+	case RoleThought:
+		prefix = "Thought"
+		style = thoughtStyle
 	case RoleTool:
 		prefix = fmt.Sprintf("Tool: %s (%s)", m.ToolCallTitle, m.ToolStatus)
 		style = toolStyle

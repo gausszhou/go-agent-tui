@@ -171,7 +171,7 @@ func (m *Model) addMessage(msg component.ChatMessage) {
 func (m *Model) renderMessages() string {
 	var sb strings.Builder
 	for _, msg := range m.messages {
-		sb.WriteString(msg.Render(m.chatViewport.Width, userLabel(), agentLabel(), toolLabel(), systemLabel()))
+		sb.WriteString(msg.Render(m.chatViewport.Width, userLabel(), agentLabel(), thoughtLabel(), toolLabel(), systemLabel()))
 		sb.WriteString("\n")
 	}
 	return sb.String()

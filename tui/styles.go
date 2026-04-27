@@ -60,6 +60,10 @@ func userLabel() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(success()).Bold(true)
 }
 
+func thoughtLabel() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(dim()).Italic(true)
+}
+
 func toolLabel() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(warning()).Bold(true)
 }

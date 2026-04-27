@@ -52,7 +52,7 @@ func (m Model) renderLeft(width, chatH int) string {
 	m.chatViewport.Height = chatH
 	vp := m.chatViewport.View()
 
-	contentLines := visibleLineCount(m.chatViewport.View())
+	contentLines := m.chatViewport.TotalLineCount()
 	sb := renderScrollbar(chatH, contentLines, m.chatViewport.YOffset)
 	chat := lipgloss.JoinHorizontal(lipgloss.Top, vp, sb)
 
@@ -110,7 +110,7 @@ func (m Model) renderInput(width int) string {
 		}
 	}
 
-	return lipgloss.NewStyle().Width(width).Render(sb.String())
+	return lipgloss.NewStyle().Width(width).Background(bg()).Render(sb.String())
 }
 
 func (m Model) renderPermissionOverlay() string {
@@ -200,13 +200,6 @@ func (m Model) renderSessionOverlay() string {
 	return overlayBox().Width(50).Render(sb.String())
 }
 
-func visibleLineCount(s string) int {
-	if s == "" {
-		return 0
-	}
-	return strings.Count(strings.TrimRight(s, "\n"), "\n") + 1
-}
-
 func renderScrollbar(height, totalLines, yOffset int) string {
 	if height <= 0 {
 		return ""
@@ -217,7 +210,7 @@ func renderScrollbar(height, totalLines, yOffset int) string {
 	var sb strings.Builder
 	if totalLines <= height {
 		for i := 0; i < height; i++ {
-			sb.WriteString(trackStyle.Render(" "))
+			sb.WriteString(trackStyle.Render("│"))
 			sb.WriteByte('\n')
 		}
 		return sb.String()
@@ -227,7 +220,7 @@ func renderScrollbar(height, totalLines, yOffset int) string {
 	maxOffset := totalLines - height
 	if maxOffset <= 0 {
 		for i := 0; i < height; i++ {
-			sb.WriteString(trackStyle.Render(" "))
+			sb.WriteString(trackStyle.Render("│"))
 			sb.WriteByte('\n')
 		}
 		return sb.String()

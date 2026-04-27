@@ -14,8 +14,12 @@ func (m Model) View() string {
 
 	bg := m.renderMainView()
 
-	if m.focus == FocusPermission {
+	switch m.focus {
+	case FocusPermission:
 		fg := m.renderPermissionOverlay()
+		return overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0)
+	case FocusCommandPanel:
+		fg := m.renderCommandPanelOverlay()
 		return overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0)
 	}
 
@@ -58,7 +62,7 @@ func (m Model) renderLeft(width, chatH int) string {
 	m.statusBar.Width = width
 	m.statusBar.Loading = m.loading
 	m.statusBar.Status = m.statusText
-	m.statusBar.Help = "Enter Send  Ctrl+S Switch  Ctrl+N New  Ctrl+I Stop  Ctrl+C Quit"
+	m.statusBar.Help = "Enter Send  Ctrl+P Commands  Ctrl+I Stop  Ctrl+H Help  Ctrl+C Quit"
 	m.statusBar.Style = statusBarBg()
 	status := m.statusBar.View()
 
@@ -68,12 +72,12 @@ func (m Model) renderLeft(width, chatH int) string {
 func (m Model) renderRight(width int) string {
 	var parts []string
 
-	usage := base().
+	model := base().
 		BorderTop(true).BorderStyle(lipgloss.NormalBorder()).
 		BorderTopForeground(border()).
 		Width(width).Padding(0, 1).
 		Render(m.usageInfo.View())
-	parts = append(parts, usage)
+	parts = append(parts, model)
 
 	tasks := base().
 		BorderTop(true).BorderStyle(lipgloss.NormalBorder()).
@@ -93,7 +97,16 @@ func (m Model) renderRight(width int) string {
 }
 
 func (m Model) renderInput(width int) string {
-	m.textarea.SetWidth(width - 2)
+	m.textarea.SetWidth(width - 4)
+
+	focused := m.focus == FocusInput
+	promptColor := muted()
+	if focused {
+		promptColor = accent()
+	}
+
+	prompt := lipgloss.NewStyle().Foreground(promptColor).Render("❯ ")
+	content := m.textarea.View()
 
 	var sb strings.Builder
 	if m.errMsg != "" {
@@ -101,11 +114,18 @@ func (m Model) renderInput(width int) string {
 		sb.WriteString("\n")
 	}
 
-	if m.focus == FocusInput {
-		sb.WriteString(inputBoxFocused().Width(width).Render(m.textarea.View()))
-	} else {
-		sb.WriteString(inputBox().Width(width).Render(m.textarea.View()))
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		if i > 0 {
+			sb.WriteString("\n")
+		}
+		if i == 0 {
+			sb.WriteString(prompt + line)
+		} else {
+			sb.WriteString(lipgloss.NewStyle().PaddingLeft(3).Render(line))
+		}
 	}
+
 	return sb.String()
 }
 
@@ -136,4 +156,40 @@ func (m Model) renderPermissionOverlay() string {
 	)
 
 	return overlayBox().MaxWidth(m.width - 10).Render(ov)
+}
+
+func (m Model) renderCommandPanelOverlay() string {
+	var sb strings.Builder
+
+	title := lipgloss.NewStyle().Foreground(accent()).Bold(true).Render("Commands")
+	sb.WriteString(title)
+	sb.WriteString("\n\n")
+
+	options := []struct {
+		label string
+		key   string
+	}{
+		{"New Session", "N"},
+		{"Switch Session", "S"},
+	}
+
+	for i, opt := range options {
+		prefix := "  "
+		if i == m.commandPanelIdx {
+			prefix = "▶ "
+		}
+		if i == m.commandPanelIdx {
+			sb.WriteString(lipgloss.NewStyle().Foreground(text()).Background(accent()).Padding(0, 1).Render(prefix + opt.label))
+		} else {
+			sb.WriteString(lipgloss.NewStyle().Foreground(muted()).Padding(0, 1).Render(prefix + opt.label))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\n")
+	help := helpLabel().Render("↑↓ navigate  Enter select  Esc cancel")
+	sb.WriteString(help)
+
+	content := sb.String()
+	return overlayBox().Width(30).Render(content)
 }

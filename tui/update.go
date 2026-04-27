@@ -192,6 +192,9 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case FocusSessionList:
 		return m.handleSessionListKey(msg)
 
+	case FocusCommandPanel:
+		return m.handleCommandPanelKey(msg)
+
 	case FocusInput:
 		return m.handleInputKey(msg)
 	}
@@ -301,6 +304,48 @@ func (m Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleCommandPanelKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		if m.commandPanelIdx > 0 {
+			m.commandPanelIdx--
+		}
+		return m, nil
+
+	case "down", "j":
+		if m.commandPanelIdx < 1 {
+			m.commandPanelIdx++
+		}
+		return m, nil
+
+	case "enter":
+		switch m.commandPanelIdx {
+		case 0:
+			m.focus = FocusInput
+			return m, m.createSession()
+		case 1:
+			if len(m.sessions) > 1 {
+				m.showSessionList = true
+				m.focus = FocusSessionList
+				return m, nil
+			}
+			m.focus = FocusInput
+			return m, nil
+		}
+		m.focus = FocusInput
+		return m, nil
+
+	case "esc", "ctrl+p":
+		m.focus = FocusInput
+		return m, nil
+
+	case "ctrl+c":
+		m.cleanup()
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
 func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key := msg.String(); key {
 	case "enter", "ctrl+e":
@@ -324,6 +369,11 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+n":
 		m.focus = FocusInput
 		return m, m.createSession()
+
+	case "ctrl+p":
+		m.focus = FocusCommandPanel
+		m.commandPanelIdx = 0
+		return m, nil
 
 	case "ctrl+s":
 		if len(m.sessions) > 1 {

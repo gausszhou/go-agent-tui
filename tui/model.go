@@ -23,6 +23,7 @@ const (
 	FocusInput     FocusArea = iota
 	FocusPermission
 	FocusSessionList
+	FocusCommandPanel
 )
 
 type Session struct {
@@ -102,6 +103,7 @@ type Model struct {
 
 	showHelp     bool
 	commandPanel component.CommandPanel
+	commandPanelIdx int
 
 	chatViewport viewport.Model
 

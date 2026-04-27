@@ -36,6 +36,8 @@ type spinnerTickMsg struct {
 	time time.Time
 }
 
+type renderTickMsg struct{}
+
 type outputEventMsg struct {
 	event client.OutputEvent
 }
@@ -97,6 +99,7 @@ type Model struct {
 	scrollDragging      bool
 	scrollDragStartY    int
 	scrollDragStartYOff int
+	viewportDirty       bool
 }
 
 func NewModel(debug bool, logger *slog.Logger) Model {
@@ -149,7 +152,6 @@ func (m Model) Init() tea.Cmd {
 			in := m.inputCh
 			out := m.outputCh
 			acpClient := client.NewClient(in, out, nil)
-
 			if m.debug && m.logger != nil {
 				m.logger.Info("starting agent process")
 			}
@@ -194,6 +196,7 @@ func (m Model) Init() tea.Cmd {
 			}
 		},
 		spinnerTick(),
+		renderTick(),
 	)
 }
 
@@ -249,6 +252,12 @@ func (m *Model) cleanup() {
 func spinnerTick() tea.Cmd {
 	return tea.Tick(time.Millisecond*80, func(t time.Time) tea.Msg {
 		return spinnerTickMsg{time: t}
+	})
+}
+
+func renderTick() tea.Cmd {
+	return tea.Tick(33*time.Millisecond, func(t time.Time) tea.Msg {
+		return renderTickMsg{}
 	})
 }
 

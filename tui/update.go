@@ -26,6 +26,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case renderTickMsg:
+		if m.viewportDirty {
+			m.viewportDirty = false
+			m.updateChatViewport()
+		}
+		return m, renderTick()
+
 	case initDoneMsg:
 		if msg.err != nil {
 			m.statusText = "Init failed: " + msg.err.Error()
@@ -72,6 +79,8 @@ func (m Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
 	case client.EventPromptDone:
 		m.promptRunning = false
 		m.loading = false
+		m.viewportDirty = false
+		m.updateChatViewport()
 		if ev.Error != nil {
 			m.statusText = "Error: " + ev.Error.Error()
 			m.errMsg = ev.Error.Error()
@@ -141,12 +150,12 @@ func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 	case u.UserMessageChunk != nil:
 		if u.UserMessageChunk.Content.Text != nil {
 			m.addMessage(component.ChatMessage{Role: component.RoleUser, Content: u.UserMessageChunk.Content.Text.Text})
-			m.updateChatViewport()
+			m.viewportDirty = true
 		}
 	case u.AgentMessageChunk != nil:
 		if u.AgentMessageChunk.Content.Text != nil {
 			m.appendAgentText(u.AgentMessageChunk.Content.Text.Text)
-			m.updateChatViewport()
+			m.viewportDirty = true
 		}
 	case u.ToolCall != nil:
 		tc := u.ToolCall
@@ -156,7 +165,7 @@ func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 			ToolCallID:    string(tc.ToolCallId),
 			ToolStatus:    string(tc.Status),
 		})
-		m.updateChatViewport()
+		m.viewportDirty = true
 	case u.ToolCallUpdate != nil:
 		tu := u.ToolCallUpdate
 		status := ""
@@ -167,7 +176,7 @@ func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 			Role:    component.RoleSystem,
 			Content: "Tool " + string(tu.ToolCallId) + " status: " + status,
 		})
-		m.updateChatViewport()
+		m.viewportDirty = true
 	case u.Plan != nil:
 		plan := u.Plan
 		for i, entry := range plan.Entries {
@@ -177,6 +186,7 @@ func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 				Status: component.TodoPending,
 			})
 		}
+		m.viewportDirty = true
 	}
 	return m, m.waitForOutput()
 }

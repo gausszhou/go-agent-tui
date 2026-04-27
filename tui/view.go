@@ -3,8 +3,8 @@ package tui
 import (
 	"strings"
 
-	overlay "github.com/rmhubbert/bubbletea-overlay"
 	"github.com/charmbracelet/lipgloss"
+	overlay "github.com/rmhubbert/bubbletea-overlay"
 )
 
 func (m Model) View() string {
@@ -100,7 +100,7 @@ func (m Model) renderInput(width int) string {
 	if m.focus == FocusInput {
 		promptColor = accent()
 	}
-	prompt := lipgloss.NewStyle().Foreground(promptColor).Render("│ ")
+	m.textarea.Prompt = lipgloss.NewStyle().Width(5).PaddingLeft(1).Foreground(promptColor).Render("│ ")
 
 	var sb strings.Builder
 	if m.errMsg != "" {
@@ -114,9 +114,9 @@ func (m Model) renderInput(width int) string {
 			sb.WriteString("\n")
 		}
 		if i == 0 {
-			sb.WriteString(prompt + line)
+			sb.WriteString(line)
 		} else {
-			sb.WriteString("   " + line)
+			sb.WriteString(line)
 		}
 	}
 

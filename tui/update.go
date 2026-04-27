@@ -337,6 +337,9 @@ func (m Model) handleCommandPanelKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key := msg.String(); key {
 	case "enter", "ctrl+e":
+		if m.promptRunning {
+			return m, nil
+		}
 		now := time.Now()
 		pasting := !m.lastKeyTime.IsZero() && now.Sub(m.lastKeyTime) < 20*time.Millisecond
 		m.lastKeyTime = now

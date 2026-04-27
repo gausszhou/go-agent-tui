@@ -58,7 +58,7 @@ func (m Model) renderLeft(width, chatH int) string {
 
 	help := "Enter Send  Ctrl+P Commands  Ctrl+C Quit"
 	if m.promptRunning {
-		help = "Enter Send  Esc Esc Interrupt  Ctrl+P Commands  Ctrl+C Quit"
+		help = "Esc Esc Interrupt  Ctrl+P Commands  Ctrl+C Quit"
 	}
 
 	m.statusBar.Width = width

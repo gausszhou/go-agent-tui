@@ -48,7 +48,7 @@ func run(debug bool) error {
 
 	acp := client.NewClient(inCh, outCh, sigCh)
 
-	cmd := exec.CommandContext(ctx, "./agent.exe")
+	cmd := exec.CommandContext(ctx, "opencode", "acp")
 	conn, err := client.NewConnection(cmd, acp, logger)
 	if err != nil {
 		return fmt.Errorf("connection failed: %w", err)

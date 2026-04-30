@@ -164,6 +164,17 @@ func (m *Model) appendAgentText(text string) {
 	m.messages = append(m.messages, component.ChatMessage{Role: component.RoleAgent, Content: text})
 }
 
+func (m *Model) appendThoughtText(text string) {
+	if len(m.messages) > 0 {
+		last := &m.messages[len(m.messages)-1]
+		if last.Role == component.RoleThought && last.ToolCallID == "" {
+			last.Content += text
+			return
+		}
+	}
+	m.messages = append(m.messages, component.ChatMessage{Role: component.RoleThought, Content: text})
+}
+
 func (m *Model) addMessage(msg component.ChatMessage) {
 	m.messages = append(m.messages, msg)
 }

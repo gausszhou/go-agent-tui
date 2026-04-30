@@ -153,10 +153,7 @@ func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 	case u.AgentThoughtChunk != nil:
 		m.logger.Debug("session update: agent thought chunk")
 		if u.AgentThoughtChunk.Content.Text != nil {
-			m.addMessage(component.ChatMessage{
-				Role:    component.RoleThought,
-				Content: u.AgentThoughtChunk.Content.Text.Text,
-			})
+			m.appendThoughtText(u.AgentThoughtChunk.Content.Text.Text)
 			m.viewportDirty = true
 		}
 	case u.ToolCall != nil:
@@ -493,71 +490,11 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	leftW := m.width * 68 / 100
-	barX := leftW - 1
-
 	switch msg.Button {
 	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
 		var cmd tea.Cmd
 		m.chatViewport, cmd = m.chatViewport.Update(msg)
 		cmds = append(cmds, cmd)
-
-	case tea.MouseButtonLeft:
-		switch msg.Action {
-		case tea.MouseActionPress:
-			if msg.X == barX && msg.Y >= 0 && msg.Y < m.chatViewport.Height {
-				contentLines := m.chatViewport.TotalLineCount()
-				m.scrollDragging = true
-				m.scrollDragStartY = msg.Y
-				m.scrollDragStartYOff = m.chatViewport.YOffset
-				if contentLines > m.chatViewport.Height && m.chatViewport.Height > 0 {
-					thumbH := max(1, m.chatViewport.Height*m.chatViewport.Height/contentLines)
-					maxOff := contentLines - m.chatViewport.Height
-					thumbY := m.chatViewport.YOffset * (m.chatViewport.Height - thumbH) / maxOff
-					if msg.Y < thumbY || msg.Y >= thumbY+thumbH {
-						tY := msg.Y * maxOff / (m.chatViewport.Height - thumbH)
-						if tY < 0 {
-							tY = 0
-						}
-						if tY > maxOff {
-							tY = maxOff
-						}
-						m.chatViewport.YOffset = tY
-					}
-				}
-			} else {
-				m.viewportFocused = msg.X > 0 && msg.X < leftW && msg.Y >= 0 && msg.Y < m.chatViewport.Height
-			}
-			if m.focus == FocusInput {
-				var cmd tea.Cmd
-				m.textarea, cmd = m.textarea.Update(msg)
-				cmds = append(cmds, cmd)
-			}
-
-		case tea.MouseActionMotion:
-			if m.scrollDragging && msg.X >= barX-2 && msg.X <= barX+2 {
-				contentLines := m.chatViewport.TotalLineCount()
-				if contentLines > m.chatViewport.Height && m.chatViewport.Height > 0 {
-					thumbH := max(1, m.chatViewport.Height*m.chatViewport.Height/contentLines)
-					maxOff := contentLines - m.chatViewport.Height
-					if m.chatViewport.Height-thumbH > 0 {
-						dY := msg.Y - m.scrollDragStartY
-						nOff := m.scrollDragStartYOff + dY*maxOff/(m.chatViewport.Height-thumbH)
-						if nOff < 0 {
-							nOff = 0
-						}
-						if nOff > maxOff {
-							nOff = maxOff
-						}
-						m.chatViewport.YOffset = nOff
-					}
-				}
-			}
-
-		case tea.MouseActionRelease:
-			m.scrollDragging = false
-		}
-
 	default:
 		if m.focus == FocusInput {
 			var cmd tea.Cmd

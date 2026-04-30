@@ -92,25 +92,7 @@ func (m Model) renderInput(width int) string {
 	}
 	m.textarea.Prompt = lipgloss.NewStyle().Width(promptWidth).Foreground(promptColor).Render("┃ ")
 
-	var sb strings.Builder
-	if m.errMsg != "" {
-		sb.WriteString(errorText().Width(width).Render("! " + m.errMsg))
-		sb.WriteString("\n")
-	}
-
-	lines := strings.Split(m.textarea.View(), "\n")
-	for i, line := range lines {
-		if i > 0 {
-			sb.WriteString("\n")
-		}
-		if i == 0 {
-			sb.WriteString(line)
-		} else {
-			sb.WriteString(line)
-		}
-	}
-
-	return lipgloss.NewStyle().Width(width).Background(bg()).Render(sb.String())
+	return lipgloss.NewStyle().Width(width).Render(m.textarea.View())
 }
 
 func (m Model) renderPermissionOverlay() string {
@@ -210,7 +192,7 @@ func renderScrollbar(height, totalLines, yOffset int) string {
 	var sb strings.Builder
 	if totalLines <= height {
 		for i := 0; i < height; i++ {
-			sb.WriteString(trackStyle.Render("│"))
+			sb.WriteString(trackStyle.Render("█"))
 			sb.WriteByte('\n')
 		}
 		return sb.String()
@@ -218,20 +200,13 @@ func renderScrollbar(height, totalLines, yOffset int) string {
 
 	thumbH := max(1, height*height/totalLines)
 	maxOffset := totalLines - height
-	if maxOffset <= 0 {
-		for i := 0; i < height; i++ {
-			sb.WriteString(trackStyle.Render("│"))
-			sb.WriteByte('\n')
-		}
-		return sb.String()
-	}
 	thumbY := yOffset * (height - thumbH) / maxOffset
 
 	for i := 0; i < height; i++ {
 		if i >= thumbY && i < thumbY+thumbH {
 			sb.WriteString(thumbStyle.Render("█"))
 		} else {
-			sb.WriteString(trackStyle.Render("│"))
+			sb.WriteString(trackStyle.Render("█"))
 		}
 		sb.WriteByte('\n')
 	}

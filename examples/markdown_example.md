@@ -62,6 +62,38 @@ main = putStrLn
      $ hello <$> [ "artichoke", "alcachofa" ]
 ```
 
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+    "path/filepath"
+    "runtime"
+)
+
+func main() {
+    // 获取当前源文件所在目录
+    _, filename, _, ok := runtime.Caller(0)
+    if !ok {
+        fmt.Println("无法获取当前文件路径")
+        return
+    }
+    dir := filepath.Dir(filename)
+
+    // 构造同目录下的目标文件路径
+    filePath := filepath.Join(dir, "example.txt")
+
+    // 读取文件内容
+    data, err := os.ReadFile(filePath)
+    if err != nil {
+        fmt.Printf("读取文件失败: %v\n", err)
+        return
+    }
+    fmt.Println(string(data))
+}
+```
+
 ***
 
 _Alcachofa_, if you were wondering, is artichoke in Spanish.

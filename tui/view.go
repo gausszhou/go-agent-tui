@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	overlay "github.com/gausszhou/go-agent-tui/tui/overlay"
+	overlay "github.com/gausszhou/text-ui-research/tui/overlay"
 )
 
 func (m Model) View() string {

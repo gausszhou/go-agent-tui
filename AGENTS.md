@@ -1,11 +1,11 @@
-# go-agent-tui
+# text-ui-research
 
 TUI for AI agents via the [ACP protocol](https://github.com/coder/acp-go-sdk) (`opencode acp`).
 
 ## Build
 
 ```bash
-go build -o go-agent-tui.exe .        # TUI app
+go build -o client.exe .        # TUI app
 go build -o agent.exe ./agent         # standalone example agent
 ```
 
@@ -13,7 +13,7 @@ go build -o agent.exe ./agent         # standalone example agent
 
 ```bash
 go run .                              # requires `opencode` in PATH
-go run . --debug                      # log to ./go-agent-tui.log in current directory
+go run . --debug                      # log to ./text-ui-research.log in current directory
 go run ./agent                        # example agent, connects via stdio
 ```
 

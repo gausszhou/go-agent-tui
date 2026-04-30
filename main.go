@@ -12,14 +12,14 @@ import (
 	acpsdk "github.com/coder/acp-go-sdk"
 	"github.com/spf13/cobra"
 
-	"github.com/gausszhou/go-agent-tui/client"
-	"github.com/gausszhou/go-agent-tui/tui"
+	"github.com/gausszhou/text-ui-research/client"
+	"github.com/gausszhou/text-ui-research/tui"
 )
 
 var debug bool
 
 var rootCmd = &cobra.Command{
-	Use:   "go-agent-tui",
+	Use:   "",
 	Short: "A TUI application for interacting with AI agents via ACP protocol",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return run(debug)
@@ -94,7 +94,7 @@ func setupLogger(debug bool) *slog.Logger {
 		return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	}
 
-	logPath := filepath.Join(".", "go-agent-tui.log")
+	logPath := filepath.Join(".", "logs/logger.log")
 	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))

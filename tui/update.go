@@ -8,8 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/coder/acp-go-sdk"
 
-	"github.com/gausszhou/go-agent-tui/client"
-	"github.com/gausszhou/go-agent-tui/tui/component"
+	"github.com/gausszhou/text-ui-research/client"
+	"github.com/gausszhou/text-ui-research/tui/component"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

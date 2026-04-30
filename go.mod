@@ -1,4 +1,4 @@
-module github.com/gausszhou/go-agent-tui
+module github.com/gausszhou/text-ui-research
 
 go 1.24.1
 

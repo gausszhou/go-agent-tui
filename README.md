@@ -1,4 +1,4 @@
-# go-agent-tui
+# text-ui-research
 
 A terminal user interface for interacting with AI agents via the [ACP protocol](https://github.com/coder/acp-go-sdk).
 
@@ -14,15 +14,15 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) v1 and [Lip 
 ## Build
 
 ```bash
-go build -o go-agent-tui.exe .        # TUI app
-go build -o agent.exe ./agent         # standalone example agent
+go build -o bin/client.exe .              # app
+go build -o bin/agent.exe ./agent         # standalone example agent
 ```
 
 ## Usage
 
 ```bash
 go run .                              # requires `opencode` in PATH
-go run . --debug                      # log to ./go-agent-tui.log
+go run . --debug                      # log to ./logger.log
 go run ./agent                        # run the example agent (stdio)
 ```
 

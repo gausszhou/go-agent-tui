@@ -471,14 +471,6 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.textarea, cmd = m.textarea.Update(msg)
 		return m, cmd
 
-	case "pgup":
-		m.chatViewport.PageUp()
-		return m, nil
-
-	case "pgdown":
-		m.chatViewport.PageDown()
-		return m, nil
-
 	default:
 		m.lastKeyTime = time.Now()
 		var cmd tea.Cmd

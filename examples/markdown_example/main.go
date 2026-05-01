@@ -46,10 +46,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.LineUp(1)
 		case "down", "j":
 			m.viewport.LineDown(1)
-		case "pgup", "b":
-			m.viewport.PageUp()
-		case "pgdn", "f", " ":
-			m.viewport.PageDown()
 		case "home":
 			m.viewport.GotoTop()
 		case "end":
@@ -60,9 +56,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 处理鼠标滚轮事件
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
-			m.viewport.ScrollUp(1)
+			m.viewport.LineUp(1)
 		case tea.MouseButtonWheelDown:
-			m.viewport.ScrollDown(1)
+			m.viewport.LineUp(1)
 		}
 
 	default:

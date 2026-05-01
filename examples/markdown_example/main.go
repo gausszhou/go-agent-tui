@@ -34,7 +34,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 		m.viewport = viewport.New(msg.Width, msg.Height-2) // 留出边距
-		m.viewport.YPosition = 0
+		m.viewport.YPosition = 1
 		m.viewport.SetContent(m.content)
 		m.ready = true
 
@@ -99,7 +99,7 @@ func main() {
 	dir := filepath.Dir(filename)
 
 	// 构造同目录下的目标文件路径
-	filePath := filepath.Join(dir, "markdown_example.md")
+	filePath := filepath.Join(dir, "data.md")
 	buffer, err := os.ReadFile(filePath)
 	if err != nil {
 		fmt.Printf("Error reading markdown file: %v\n", err)

@@ -6,8 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/charmbracelet/glamour"
+	"time"
 )
 
 func getCurrentFilePath() string {
@@ -29,17 +28,14 @@ func main() {
 	}
 	markdown := string(buffer)
 
-	// 使用 glamour 渲染 Markdown 为带 ANSI 颜色的字符串
-	rendered, err := glamour.Render(markdown, "dark")
-	if err != nil {
-		rendered = markdown // 降级为纯文本
+	// 流式输出原始文本
+	for _, ch := range markdown {
+		fmt.Print(string(ch))
+		time.Sleep(10 * time.Millisecond) // 模拟流式效果
 	}
 
-	// 直接输出到 stdout
-	fmt.Print(rendered)
-
-	// 确保输出末尾有换行
-	if !strings.HasSuffix(rendered, "\n") {
+	// 确保末尾换行
+	if !strings.HasSuffix(markdown, "\n") {
 		fmt.Println()
 	}
 }

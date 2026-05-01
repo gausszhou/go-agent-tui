@@ -36,7 +36,7 @@ var (
 	dimStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240"))
 
-	// Claude Code 风格输入框样式
+	// Alan Code 风格输入框样式
 	inputPromptStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("39")).
 				Bold(true)
@@ -114,7 +114,7 @@ func (g *AIResponseGenerator) GenerateResponse(userInput string) string {
 
 	switch {
 	case strings.Contains(input, "hello") || strings.Contains(input, "hi"):
-		return "Hello! I'm Claude Code, your AI coding assistant. I can help you with:\n\n" +
+		return "Hello! I'm Alan Code, your AI coding assistant. I can help you with:\n\n" +
 			"• Writing and reviewing code\n" +
 			"• Debugging issues\n" +
 			"• Explaining complex concepts\n" +
@@ -232,22 +232,9 @@ func showSpinner(message string, duration time.Duration) {
 
 // ========== UI 组件 ==========
 
-// Claude Code 风格输入提示符
+// Alan Code 风格输入提示符
 func getUserPrompt() string {
-	// 简洁风格: > User
 	return inputPromptStyle.Render("> ") + inputUserStyle.Render("User") + inputPromptStyle.Render(" ")
-}
-
-// 带文件上下文的提示符
-func getUserPromptWithContext(currentFile string) string {
-	if currentFile != "" {
-		return inputPromptStyle.Render("> ") +
-			inputUserStyle.Render("User") +
-			inputAtStyle.Render("@") +
-			dimStyle.Render(currentFile) +
-			inputPromptStyle.Render(" ")
-	}
-	return getUserPrompt()
 }
 
 // 显示思考动画（多阶段）
@@ -321,7 +308,7 @@ func printHeader() {
 	header := headerStyle.Render(
 		lipgloss.JoinVertical(
 			lipgloss.Center,
-			primaryStyle.Bold(true).Render("Claude Code"),
+			primaryStyle.Bold(true).Render("Alan Code"),
 			dimStyle.Render("AI Coding Assistant"),
 		),
 	)
@@ -338,9 +325,9 @@ func printHelp() {
 		"  /review        " + dimStyle.Render("Review code changes"),
 		"  /test          " + dimStyle.Render("Run tests"),
 		"  /explain       " + dimStyle.Render("Explain code"),
-		"  /exit          " + dimStyle.Render("Exit Claude Code"),
+		"  /exit          " + dimStyle.Render("Exit Alan Code"),
 		"",
-		"  " + dimStyle.Render("Tip: Use @filename to reference files"),
+		"  " + dimStyle.Render("Tip: Just type your question naturally!"),
 	}
 
 	helpContent := lipgloss.JoinVertical(
@@ -355,10 +342,6 @@ func printHelp() {
 	fmt.Println()
 }
 
-func printThinking() {
-	fmt.Println(infoStyle.Render("  🤔 Thinking..."))
-}
-
 func printDivider() {
 	fmt.Println(dimStyle.Render(strings.Repeat("─", 60)))
 }
@@ -368,7 +351,7 @@ func getUserMessageHeader() string {
 }
 
 func getAssistantHeader() string {
-	return assistantStyle.Render("💬 ") + successStyle.Render("Claude Code") + assistantStyle.Render(":")
+	return assistantStyle.Render("💬 ") + successStyle.Render("Alan Code") + assistantStyle.Render(":")
 }
 
 // ========== 主程序 ==========
@@ -390,8 +373,8 @@ func main() {
 	}
 
 	for {
-		// 显示 Claude Code 风格提示符
-		fmt.Print(getUserPromptWithContext(conversation.CurrentFile))
+		// 显示 Alan Code 风格提示符
+		fmt.Print(getUserPrompt())
 
 		// 读取用户输入
 		input, err := reader.ReadString('\n')
@@ -481,26 +464,15 @@ TestDatabaseConnection timed out
 
 To get the best explanation:
 1. Select the code you want explained
-2. Use @filename to reference specific files
-3. Ask "explain how X works"
+2. Ask specific questions about the code
+3. Use "explain how X works" format
 
-**Example:** @main.go explain the authentication flow`
+**Example:** "explain how the authentication flow works"`
 			fmt.Println(getAssistantHeader())
 			fmt.Println()
 			ai.StreamOutput(response)
 			printDivider()
 			continue
-		}
-
-		// 处理 @ 文件引用
-		if strings.Contains(input, "@") {
-			parts := strings.Split(input, "@")
-			if len(parts) > 1 {
-				fileRef := strings.Fields(parts[1])[0]
-				fmt.Println(dimStyle.Render("  📁 Referencing file: " + fileRef))
-				conversation.CurrentFile = fileRef
-				time.Sleep(300 * time.Millisecond)
-			}
 		}
 
 		// 显示用户消息

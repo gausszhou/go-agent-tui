@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/term"
 )
 
 // ========== 全局样式定义 ==========
@@ -26,10 +27,6 @@ var (
 			Foreground(lipgloss.Color("196")).
 			Bold(true)
 
-	warningStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("208")).
-			Bold(true)
-
 	infoStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("42"))
 
@@ -41,33 +38,21 @@ var (
 				Foreground(lipgloss.Color("39")).
 				Bold(true)
 
-	inputBracketStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("240"))
-
 	inputUserStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("226")).
 			Bold(true)
 
-	inputAtStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240"))
-
 	assistantStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("255"))
 
-	codeStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("214"))
-
-	dividerStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240"))
-
 	// 布局样式
 	headerStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			Border(lipgloss.ThickBorder()).
 			BorderForeground(lipgloss.Color("39")).
-			Padding(0, 1)
+			Padding(0, 2)
 
 	helpBoxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			Border(lipgloss.ThickBorder()).
 			BorderForeground(lipgloss.Color("240")).
 			Padding(0, 2)
 
@@ -79,9 +64,6 @@ var (
 	userBubbleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("226")).
 			Bold(true)
-
-	assistantBubbleStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("255"))
 )
 
 // ========== 上下文管理 ==========
@@ -95,6 +77,14 @@ type Message struct {
 	Role      string
 	Content   string
 	Timestamp time.Time
+}
+
+func getTerminalWidth() int {
+	width, _, err := term.GetSize(os.Stdout.Fd())
+	if err != nil {
+		return 80
+	}
+	return width
 }
 
 // ========== 模拟 AI 响应生成器 ==========
@@ -166,141 +156,25 @@ func (g *AIResponseGenerator) StreamOutput(text string) {
 	}
 }
 
-// 显示 Spinner（带进度百分比）
-func showSpinnerWithProgress(message string, duration time.Duration) {
-	spinnerChars := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	done := make(chan bool)
-	startTime := time.Now()
-
-	go func() {
-		i := 0
-		for {
-			select {
-			case <-done:
-				fmt.Print("\r\033[K")
-				fmt.Println(successStyle.Render("✓") + " " + message)
-				return
-			default:
-				elapsed := time.Since(startTime)
-				percent := int(float64(elapsed) / float64(duration) * 100)
-				if percent > 100 {
-					percent = 100
-				}
-				spinner := spinnerChars[i%len(spinnerChars)]
-				progressBar := strings.Repeat("█", percent/5) + strings.Repeat("░", 20-percent/5)
-				fmt.Printf("\r%s %s %s [%s] %d%%",
-					infoStyle.Render(spinner),
-					message,
-					dimStyle.Render(progressBar),
-					dimStyle.Render(fmt.Sprintf("%d%%", percent)))
-				time.Sleep(80 * time.Millisecond)
-				i++
-			}
-		}
-	}()
-
-	time.Sleep(duration)
-	close(done)
-	time.Sleep(100 * time.Millisecond)
-}
-
-// 简单 Spinner
-func showSpinner(message string, duration time.Duration) {
-	spinnerChars := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	done := make(chan bool)
-
-	go func() {
-		i := 0
-		for {
-			select {
-			case <-done:
-				fmt.Print("\r\033[K")
-				fmt.Println(successStyle.Render("✓") + " " + message)
-				return
-			default:
-				fmt.Printf("\r%s %s", infoStyle.Render(spinnerChars[i%len(spinnerChars)]), message)
-				time.Sleep(80 * time.Millisecond)
-				i++
-			}
-		}
-	}()
-
-	time.Sleep(duration)
-	close(done)
-	time.Sleep(100 * time.Millisecond)
-}
-
 // ========== UI 组件 ==========
 
 // Alan Code 风格输入提示符
 func getUserPrompt() string {
-	return inputPromptStyle.Render("> ") + inputUserStyle.Render("User") + inputPromptStyle.Render(" ")
+	return inputPromptStyle.Render("> ")
 }
 
-// 显示思考动画（多阶段）
-func showThinkingAnimation(complexity int) {
-	// 根据问题复杂度决定思考时间
-	// complexity: 1-简单, 2-中等, 3-复杂
-	var stages []string
-	var totalDuration time.Duration
-
-	switch complexity {
-	case 1:
-		stages = []string{
-			"🤔 理解问题...",
-			"💭 准备回答...",
-		}
-		totalDuration = 800 * time.Millisecond
-	case 2:
-		stages = []string{
-			"🤔 分析问题...",
-			"🔍 搜索相关知识...",
-			"💭 组织回答...",
-		}
-		totalDuration = 1500 * time.Millisecond
-	default:
-		stages = []string{
-			"🤔 深入分析...",
-			"🔍 检索代码库...",
-			"📖 阅读文档...",
-			"⚡ 生成解决方案...",
-			"💭 优化回答...",
-		}
-		totalDuration = 2500 * time.Millisecond
-	}
-
-	stageDuration := totalDuration / time.Duration(len(stages))
-
-	for _, stage := range stages {
-		fmt.Printf("\r\033[K%s %s", infoStyle.Render("●"), stage)
-		time.Sleep(stageDuration)
-	}
-	fmt.Print("\r\033[K")
-	fmt.Println(infoStyle.Render("✓") + " 准备就绪")
+func getUserMessageHeader() string {
+	return ">"
 }
 
-// 检测问题复杂度
-func detectComplexity(input string) int {
-	input = strings.ToLower(input)
+// 显示思考动画
+func showThinkingAnimation() {
+	spinner := NewSpinner()
+	spinner.message = "Thinking..."
+	spinner.Start("Thinking...")
+	time.Sleep(2500 * time.Millisecond)
+	spinner.Stop()
 
-	// 复杂问题关键词
-	complexKeywords := []string{"explain", "how", "why", "debug", "performance", "optimize", "architecture", "design"}
-	// 中等问题关键词
-	mediumKeywords := []string{"review", "test", "what", "when", "where", "help"}
-
-	for _, kw := range complexKeywords {
-		if strings.Contains(input, kw) {
-			return 3 // 复杂
-		}
-	}
-
-	for _, kw := range mediumKeywords {
-		if strings.Contains(input, kw) {
-			return 2 // 中等
-		}
-	}
-
-	return 1 // 简单
 }
 
 func printHeader() {
@@ -309,11 +183,9 @@ func printHeader() {
 		lipgloss.JoinVertical(
 			lipgloss.Center,
 			primaryStyle.Bold(true).Render("Alan Code"),
-			dimStyle.Render("AI Coding Assistant"),
 		),
 	)
 	fmt.Println(header)
-	fmt.Println()
 	fmt.Println(statusStyle.Render("  Type your question. Use /help for commands."))
 	fmt.Println()
 }
@@ -322,9 +194,6 @@ func printHelp() {
 	commands := []string{
 		"  /help          " + dimStyle.Render("Show this help message"),
 		"  /clear         " + dimStyle.Render("Clear conversation"),
-		"  /review        " + dimStyle.Render("Review code changes"),
-		"  /test          " + dimStyle.Render("Run tests"),
-		"  /explain       " + dimStyle.Render("Explain code"),
 		"  /exit          " + dimStyle.Render("Exit Alan Code"),
 		"",
 		"  " + dimStyle.Render("Tip: Just type your question naturally!"),
@@ -342,26 +211,19 @@ func printHelp() {
 	fmt.Println()
 }
 
-func printDivider() {
-	fmt.Println(dimStyle.Render(strings.Repeat("─", 60)))
+func deletePreviousLine() {
+	fmt.Print("\033[1A") // 上移一行
+	fmt.Print("\033[K")  // 删除当前行
 }
 
-func getUserMessageHeader() string {
-	return userBubbleStyle.Render("You:")
-}
-
-func getAssistantHeader() string {
-	return assistantStyle.Render("💬 ") + successStyle.Render("Alan Code") + assistantStyle.Render(":")
+func printDivider(width int) {
+	fmt.Println(dimStyle.Render(strings.Repeat("─", width)))
 }
 
 // ========== 主程序 ==========
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	// 清屏
-	fmt.Print("\033[2J\033[H")
-
-	// 打印头部
 	printHeader()
 
 	ai := NewAIResponseGenerator()
@@ -373,10 +235,9 @@ func main() {
 	}
 
 	for {
-		// 显示 Alan Code 风格提示符
+		width := getTerminalWidth()
+		printDivider(width)
 		fmt.Print(getUserPrompt())
-
-		// 读取用户输入
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Println(errorStyle.Render("Error reading input"))
@@ -407,78 +268,12 @@ func main() {
 			fmt.Println(successStyle.Render("  ✨ Conversation cleared"))
 			fmt.Println()
 			continue
-
-		case "/review":
-			fmt.Println()
-			showSpinnerWithProgress("Reviewing code changes", 1500*time.Millisecond)
-			fmt.Println()
-			response := `**Code Review Summary**
-
-Files changed: 3
-Lines added: +47
-Lines removed: -12
-
-**Issues found:**
-• Line 23: Missing error handling
-• Line 56: Potential nil pointer
-
-**Suggestions:**
-• Add unit tests for new functions
-• Consider extracting duplicate logic
-
-Would you like me to fix these issues?`
-			fmt.Println(getAssistantHeader())
-			fmt.Println()
-			ai.StreamOutput(response)
-			printDivider()
-			continue
-
-		case "/test":
-			fmt.Println()
-			showSpinnerWithProgress("Running tests", 2000*time.Millisecond)
-			fmt.Println()
-			response := `🧪 **Test Results**
-
-✅ TestUserLogin - PASS (0.23s)
-✅ TestDataFetch - PASS (0.45s)
-⚠️ TestAuthMiddleware - SKIPPED
-❌ TestDatabaseConnection - FAIL (0.12s)
-
-**Coverage:** 73.5%
-
-**Failed test details:**
-TestDatabaseConnection timed out
-
-**Recommendation:** Check if PostgreSQL is running`
-			fmt.Println(getAssistantHeader())
-			fmt.Println()
-			ai.StreamOutput(response)
-			printDivider()
-			continue
-
-		case "/explain":
-			fmt.Println()
-			showSpinnerWithProgress("Analyzing code", 1800*time.Millisecond)
-			fmt.Println()
-			response := `📚 **Explanation**
-
-To get the best explanation:
-1. Select the code you want explained
-2. Ask specific questions about the code
-3. Use "explain how X works" format
-
-**Example:** "explain how the authentication flow works"`
-			fmt.Println(getAssistantHeader())
-			fmt.Println()
-			ai.StreamOutput(response)
-			printDivider()
-			continue
 		}
 
 		// 显示用户消息
-		fmt.Println()
-		fmt.Println(getUserMessageHeader())
-		fmt.Println(dimStyle.Render("  " + input))
+
+		deletePreviousLine()
+		fmt.Println(dimStyle.Background(lipgloss.Color("#282828")).Width(width - 2).Render(getUserMessageHeader() + " " + input))
 
 		// 记录用户消息
 		conversation.Messages = append(conversation.Messages, Message{
@@ -488,16 +283,9 @@ To get the best explanation:
 		})
 
 		// 检测问题复杂度并显示相应的思考动画
-		complexity := detectComplexity(input)
 
-		// 显示思考动画
 		fmt.Println()
-		showThinkingAnimation(complexity)
-
-		// 显示助手头部
-		fmt.Println()
-		fmt.Println(getAssistantHeader())
-		fmt.Println()
+		showThinkingAnimation()
 
 		// 生成并流式输出响应
 		response := ai.GenerateResponse(input)
@@ -510,8 +298,6 @@ To get the best explanation:
 			Timestamp: time.Now(),
 		})
 
-		// 输出分隔线
 		fmt.Println()
-		printDivider()
 	}
 }

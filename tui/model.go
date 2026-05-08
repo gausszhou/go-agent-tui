@@ -2,6 +2,8 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os/exec"
 	"strings"
@@ -11,93 +13,39 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/coder/acp-go-sdk"
 
 	"github.com/gausszhou/text-ui-research/client"
 	"github.com/gausszhou/text-ui-research/tui/component"
-	"github.com/gausszhou/text-ui-research/tui/layout"
+	"github.com/gausszhou/text-ui-research/tui/theme"
 )
-
-type FocusArea int
-
-const (
-	FocusInput FocusArea = iota
-	FocusPermission
-	FocusSessionList
-	FocusCommandPanel
-)
-
-type Session struct {
-	ID   string
-	Name string
-	CWD  string
-}
-
-type spinnerTickMsg struct {
-	time time.Time
-}
-
-type renderTickMsg struct{}
-
-type outputEventMsg struct {
-	event client.OutputEvent
-}
 
 type Model struct {
-	width  int
-	height int
-	debug  bool
-	logger *slog.Logger
-
-	acp      *client.ACPClient
+	logger   *slog.Logger
 	inputCh  chan client.InputCommand
 	outputCh chan client.OutputEvent
 	cmd      *exec.Cmd
 	ctx      context.Context
 	cancel   context.CancelFunc
 
-	focus FocusArea
+	width  int
+	height int
 
-	pendingPerm *client.PermissionRequest
-	questionBox component.QuestionBox
-
-	messages []component.ChatMessage
-
-	textarea textarea.Model
-
-	spinner component.Loading
-	loading bool
-
-	sessions        []Session
-	activeSessionID string
-	sessionList     component.SessionList
-
-	usageInfo component.UsageInfo
-	todoList  component.TodoList
-	statusBar component.StatusBar
-
-	commandPanelIdx int
-
+	textarea     textarea.Model
 	chatViewport viewport.Model
 
+	messages []component.Message
+
+	loading       bool
 	promptRunning bool
-	interrupted   bool
-
-	errMsg     string
-	statusText string
-
-	lastKeyTime         time.Time
-	lastEscTime         time.Time
-	viewportFocused     bool
-	scrollDragging      bool
-	scrollDragStartY    int
-	scrollDragStartYOff int
-	viewportDirty       bool
+	statusText    string
+	lastKeyTime   time.Time
 }
 
-func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.Cmd, sessionID string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {
+func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {
 	ta := textarea.New()
-	ta.Placeholder = "Type a message... (Enter to Send, Shift+Enter for newline)"
+	ta.Placeholder = "Type a message... (Enter to Send)"
 	ta.SetWidth(80)
 	ta.SetHeight(5)
 	ta.Focus()
@@ -107,145 +55,240 @@ func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.
 
 	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 
-	m := &Model{
-		debug:  debug,
-		logger: logger,
+	styles := textarea.DefaultDarkStyles()
+	styles.Focused.Base = styles.Focused.Base.Background(theme.ThemeInputBg)
+	styles.Blurred.Base = styles.Blurred.Base.Background(theme.ThemeInputBg)
+	ta.SetStyles(styles)
 
-		acp:      acp,
-		inputCh:  inputCh,
-		outputCh: outputCh,
-		cmd:      cmd,
-		ctx:      ctx,
-		cancel:   cancel,
-
-		activeSessionID: sessionID,
-
-		focus: FocusInput,
-
-		textarea: ta,
-		spinner:  component.NewLoading(loadingSpinner()),
-		loading:  false,
-
-		sessions: []Session{
-			{ID: sessionID, Name: "Session 1", CWD: client.MustCwd()},
-		},
-		sessionList: component.SessionList{
-			Sessions: []component.SessionItem{
-				{ID: sessionID, Name: "Session 1", Active: true},
-			},
-		},
-		usageInfo:    component.NewUsageInfo(),
-		todoList:     component.NewTodoList("Tasks"),
-		statusBar:    component.NewStatusBar(),
+	return &Model{
+		logger:       logger,
+		inputCh:      inputCh,
+		outputCh:     outputCh,
+		cmd:          cmd,
+		ctx:          ctx,
+		cancel:       cancel,
+		textarea:     ta,
 		chatViewport: vp,
-
-		statusText: "Ready",
+		statusText:   "Ready",
 	}
-	return m
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(spinnerTick(), renderTick())
+	return nil
 }
 
-func (m *Model) sendInput(cmd client.InputCommand) {
-	select {
-	case m.inputCh <- cmd:
-	default:
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		m.updateSizes()
+		return m, nil
+
+	case tea.KeyMsg:
+		return m.handleKey(msg)
+
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+
+	case outputEventMsg:
+		return m.handleOutput(msg.event)
 	}
+	return m, nil
 }
 
-func (m *Model) appendAgentText(text string) {
-	if len(m.messages) > 0 {
-		last := &m.messages[len(m.messages)-1]
-		if last.Role == component.RoleAgent && last.ToolCallID == "" {
-			last.Content += text
-			return
+func (m *Model) View() tea.View {
+	if m.width == 0 || m.height == 0 {
+		return tea.NewView("Initializing...")
+	}
+
+	chat := m.chatViewport.View()
+	input := m.renderInput()
+	status := theme.StatusBar().
+		Width(m.width - 4).
+		Render(m.statusText)
+
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
+		chat,
+		"\n"+input,
+		status,
+	)
+
+	view := tea.NewView(theme.PureBlack().
+		Width(m.width).
+		Height(m.height).
+		Padding(0, 2).
+		Render(content))
+	view.AltScreen = true
+	view.MouseMode = tea.MouseModeAllMotion
+	return view
+}
+
+func (m *Model) renderInput() string {
+	m.textarea.Prompt = theme.AccentStyle().Render("┃ ")
+	return m.textarea.View()
+}
+
+func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		if m.promptRunning {
+			return m, nil
 		}
-	}
-	m.messages = append(m.messages, component.ChatMessage{Role: component.RoleAgent, Content: text})
-}
-
-func (m *Model) appendThoughtText(text string) {
-	if len(m.messages) > 0 {
-		last := &m.messages[len(m.messages)-1]
-		if last.Role == component.RoleThought && last.ToolCallID == "" {
-			last.Content += text
-			return
+		text := m.textarea.Value()
+		if text == "" {
+			return m, nil
 		}
+		m.textarea.Reset()
+		m.messages = append(m.messages, component.Message{Role: "user", Content: text})
+		m.promptRunning = true
+		m.loading = true
+		m.statusText = "Processing..."
+		m.inputCh <- client.InputCommand{Type: client.CmdPrompt, Text: text}
+		m.chatViewport.SetContent(m.renderMessages())
+		return m, waitForOutput(m.outputCh)
+
+	case "ctrl+c":
+		m.cleanup()
+		return m, tea.Quit
+
+	case "up", "k":
+		m.chatViewport.ScrollUp(1)
+		return m, nil
+
+	case "down", "j":
+		m.chatViewport.ScrollDown(1)
+		return m, nil
 	}
-	m.messages = append(m.messages, component.ChatMessage{Role: component.RoleThought, Content: text})
+
+	var cmd tea.Cmd
+	m.textarea, cmd = m.textarea.Update(msg)
+	return m, cmd
 }
 
-func (m *Model) addMessage(msg component.ChatMessage) {
-	m.messages = append(m.messages, msg)
+func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
+		var cmd tea.Cmd
+		m.chatViewport, cmd = m.chatViewport.Update(msg)
+		return m, cmd
+	}
+	return m, nil
+}
+
+func (m *Model) handleOutput(ev client.OutputEvent) (tea.Model, tea.Cmd) {
+	if ev.Update != nil {
+		update := ev.Update.Update
+		if update.AgentMessageChunk != nil && update.AgentMessageChunk.Content.Text != nil {
+			text := update.AgentMessageChunk.Content.Text.Text
+			if len(m.messages) > 0 && m.messages[len(m.messages)-1].Role == "agent" {
+				m.messages[len(m.messages)-1].Content += text
+			} else {
+				m.messages = append(m.messages, component.Message{Role: "agent", Content: text})
+			}
+		}
+		if update.AgentThoughtChunk != nil && update.AgentThoughtChunk.Content.Text != nil {
+			text := update.AgentThoughtChunk.Content.Text.Text
+			if len(m.messages) > 0 && m.messages[len(m.messages)-1].Role == "thought" {
+				m.messages[len(m.messages)-1].Content += text
+			} else {
+				m.messages = append(m.messages, component.Message{Role: "thought", Content: text})
+			}
+		}
+		if update.ToolCall != nil {
+			tc := update.ToolCall
+			label := tc.Title
+			input, _ := json.Marshal(tc.RawInput)
+			m.messages = append(m.messages, component.Message{Role: "tool", Content: label + "\n" + string(input)})
+		}
+		if update.ToolCallUpdate != nil {
+			tu := update.ToolCallUpdate
+			status := "completed"
+			if tu.Status != nil {
+				status = string(*tu.Status)
+			}
+			output := ""
+			if tu.RawOutput != nil {
+				output = fmt.Sprintf("%v", tu.RawOutput)
+			}
+			if output != "" {
+				m.messages = append(m.messages, component.Message{Role: "result", Content: status + ": " + output})
+			}
+		}
+		if update.Plan != nil {
+			var lines []string
+			for _, e := range update.Plan.Entries {
+				mark := " "
+				if e.Status == acp.PlanEntryStatusCompleted {
+					mark = "✓"
+				} else if e.Status == acp.PlanEntryStatusInProgress {
+					mark = "→"
+				}
+				lines = append(lines, fmt.Sprintf("[%s] %s", mark, e.Content))
+			}
+			m.messages = append(m.messages, component.Message{Role: "plan", Content: strings.Join(lines, "\n")})
+		}
+		m.chatViewport.SetContent(m.renderMessages())
+		m.chatViewport.GotoBottom()
+		return m, waitForOutput(m.outputCh)
+	}
+
+	switch ev.Kind {
+	case "done":
+		m.promptRunning = false
+		m.loading = false
+		m.statusText = "Ready"
+		m.chatViewport.SetContent(m.renderMessages())
+		m.chatViewport.GotoBottom()
+	case "error":
+		m.promptRunning = false
+		m.loading = false
+		m.statusText = "Error: " + ev.Error.Error()
+	}
+	return m, nil
+}
+
+func (m *Model) updateSizes() {
+	chatW := m.width - 4
+	chatH := m.height - 8
+	m.chatViewport.SetWidth(chatW)
+	m.chatViewport.SetHeight(chatH)
+	m.chatViewport.Style = lipgloss.NewStyle()
+
+	inputW := m.width - 4
+	m.textarea.SetWidth(inputW)
+	m.textarea.SetHeight(5)
 }
 
 func (m *Model) renderMessages() string {
-	var sb strings.Builder
+	w := m.chatViewport.Width()
+	var content string
 	for _, msg := range m.messages {
-		sb.WriteString(msg.Render(m.chatViewport.Width()))
-		sb.WriteString("\n")
+		content += msg.Render(w)
 	}
-	return sb.String()
-}
-
-func (m *Model) updateChatViewport() {
-	leftW := layout.GetLeftWidth(m.width)
-	chatH := layout.GetChatHeight(m.height)
-	vpW := layout.GetChatWidth(leftW)
-	m.chatViewport.SetWidth(vpW)
-	m.chatViewport.SetHeight(chatH)
-
-	inputW := layout.GetInputWidth(leftW)
-	inputH := layout.GetInputHeight()
-	m.textarea.SetWidth(inputW)
-	m.textarea.SetHeight(inputH)
-	m.chatViewport.SetContent(m.renderMessages())
-	m.chatViewport.GotoBottom()
-}
-
-func (m *Model) interruptPrompt() {
-	m.sendInput(client.InputCommand{Type: client.CmdInterrupt})
-	m.interrupted = true
-	m.statusText = "Interrupted"
+	return content
 }
 
 func (m *Model) cleanup() {
-	m.interruptPrompt()
 	if m.cmd != nil && m.cmd.Process != nil {
 		_ = m.cmd.Process.Kill()
 	}
 	m.cancel()
 }
 
-func spinnerTick() tea.Cmd {
-	return tea.Tick(time.Millisecond*80, func(t time.Time) tea.Msg {
-		return spinnerTickMsg{time: t}
-	})
+func waitForOutput(ch chan client.OutputEvent) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return outputEventMsg{event: ev}
+	}
 }
 
-func renderTick() tea.Cmd {
-	return tea.Tick(33*time.Millisecond, func(t time.Time) tea.Msg {
-		return renderTickMsg{}
-	})
+type outputEventMsg struct {
+	event client.OutputEvent
 }
 
-func makePermissionQuestionBox(req acp.RequestPermissionRequest, width int) component.QuestionBox {
-	title := "Permission Required"
-	if req.ToolCall.Title != nil {
-		title = *req.ToolCall.Title
-	}
-
-	message := "Agent is requesting permission to proceed."
-	if req.ToolCall.ToolCallId != "" {
-		message = "Tool call requires permission: " + string(req.ToolCall.ToolCallId)
-	}
-
-	options := make([]string, len(req.Options))
-	for i, opt := range req.Options {
-		options[i] = opt.Name + " (" + string(opt.Kind) + ")"
-	}
-
-	return component.NewQuestionBox(title, message, options, width)
-}
+var _ tea.Model = (*Model)(nil)

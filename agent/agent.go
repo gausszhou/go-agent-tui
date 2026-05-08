@@ -2,475 +2,261 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
-	"io"
-	"log/slog"
+	"log"
+	"math/rand"
 	"os"
-	"os/exec"
-	"os/signal"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/coder/acp-go-sdk"
 )
 
-type agentSession struct {
-	cancel context.CancelFunc
+var examples = []string{
+	"examples/markdown_example.md",
+	"examples/go_best_practices.md",
+	"examples/api_design_guide.md",
+	"examples/sql_optimization.md",
 }
 
-type exampleAgent struct {
+type mockAgent struct {
 	conn     *acp.AgentSideConnection
-	sessions map[string]*agentSession
+	sessions map[string]context.CancelFunc
 	mu       sync.Mutex
 }
 
-var (
-	_ acp.Agent             = (*exampleAgent)(nil)
-	_ acp.AgentLoader       = (*exampleAgent)(nil)
-	_ acp.AgentExperimental = (*exampleAgent)(nil)
-)
-
-func newExampleAgent() *exampleAgent {
-	return &exampleAgent{sessions: make(map[string]*agentSession)}
+func newMockAgent() *mockAgent {
+	return &mockAgent{sessions: make(map[string]context.CancelFunc)}
 }
 
-// SetSessionMode implements acp.Agent.
-func (a *exampleAgent) SetSessionMode(ctx context.Context, params acp.SetSessionModeRequest) (acp.SetSessionModeResponse, error) {
-	return acp.SetSessionModeResponse{}, nil
+func (a *mockAgent) SetAgentConnection(conn *acp.AgentSideConnection) {
+	a.conn = conn
 }
 
-// UnstableForkSession implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableForkSession(ctx context.Context, params acp.UnstableForkSessionRequest) (acp.UnstableForkSessionResponse, error) {
-	return acp.UnstableForkSessionResponse{}, acp.NewMethodNotFound(acp.AgentMethodSessionFork)
+func (a *mockAgent) Authenticate(ctx context.Context, params acp.AuthenticateRequest) (acp.AuthenticateResponse, error) {
+	return acp.AuthenticateResponse{}, nil
 }
 
-// ListSessions implements acp.Agent.
-func (a *exampleAgent) ListSessions(ctx context.Context, params acp.ListSessionsRequest) (acp.ListSessionsResponse, error) {
-	return acp.ListSessionsResponse{}, acp.NewMethodNotFound(acp.AgentMethodSessionList)
-}
-
-// UnstableResumeSession implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableResumeSession(ctx context.Context, params acp.UnstableResumeSessionRequest) (acp.UnstableResumeSessionResponse, error) {
-	return acp.UnstableResumeSessionResponse{}, acp.NewMethodNotFound(acp.AgentMethodSessionResume)
-}
-
-// SetSessionConfigOption implements acp.Agent.
-func (a *exampleAgent) SetSessionConfigOption(ctx context.Context, params acp.SetSessionConfigOptionRequest) (acp.SetSessionConfigOptionResponse, error) {
-	return acp.SetSessionConfigOptionResponse{}, acp.NewMethodNotFound(acp.AgentMethodSessionSetConfigOption)
-}
-
-// UnstableSetSessionModel implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableSetSessionModel(ctx context.Context, params acp.UnstableSetSessionModelRequest) (acp.UnstableSetSessionModelResponse, error) {
-	return acp.UnstableSetSessionModelResponse{}, acp.NewMethodNotFound(acp.AgentMethodSessionSetModel)
-}
-
-// UnstableDidChangeDocument implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableDidChangeDocument(ctx context.Context, params acp.UnstableDidChangeDocumentNotification) error {
-	return nil
-}
-
-// UnstableDidCloseDocument implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableDidCloseDocument(ctx context.Context, params acp.UnstableDidCloseDocumentNotification) error {
-	return nil
-}
-
-// UnstableDidFocusDocument implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableDidFocusDocument(ctx context.Context, params acp.UnstableDidFocusDocumentNotification) error {
-	return nil
-}
-
-// UnstableDidOpenDocument implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableDidOpenDocument(ctx context.Context, params acp.UnstableDidOpenDocumentNotification) error {
-	return nil
-}
-
-// UnstableDidSaveDocument implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableDidSaveDocument(ctx context.Context, params acp.UnstableDidSaveDocumentNotification) error {
-	return nil
-}
-
-// UnstableLogout implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableLogout(ctx context.Context, params acp.UnstableLogoutRequest) (acp.UnstableLogoutResponse, error) {
-	return acp.UnstableLogoutResponse{}, acp.NewMethodNotFound(acp.AgentMethodLogout)
-}
-
-// UnstableAcceptNes implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableAcceptNes(ctx context.Context, params acp.UnstableAcceptNesNotification) error {
-	return nil
-}
-
-// UnstableCloseNes implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableCloseNes(ctx context.Context, params acp.UnstableCloseNesRequest) (acp.UnstableCloseNesResponse, error) {
-	return acp.UnstableCloseNesResponse{}, acp.NewMethodNotFound(acp.AgentMethodNesClose)
-}
-
-// UnstableRejectNes implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableRejectNes(ctx context.Context, params acp.UnstableRejectNesNotification) error {
-	return nil
-}
-
-// UnstableStartNes implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableStartNes(ctx context.Context, params acp.UnstableStartNesRequest) (acp.UnstableStartNesResponse, error) {
-	return acp.UnstableStartNesResponse{}, acp.NewMethodNotFound(acp.AgentMethodNesStart)
-}
-
-// UnstableSuggestNes implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableSuggestNes(ctx context.Context, params acp.UnstableSuggestNesRequest) (acp.UnstableSuggestNesResponse, error) {
-	return acp.UnstableSuggestNesResponse{}, acp.NewMethodNotFound(acp.AgentMethodNesSuggest)
-}
-
-// UnstableDisableProviders implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableDisableProviders(ctx context.Context, params acp.UnstableDisableProvidersRequest) (acp.UnstableDisableProvidersResponse, error) {
-	return acp.UnstableDisableProvidersResponse{}, acp.NewMethodNotFound(acp.AgentMethodProvidersDisable)
-}
-
-// UnstableListProviders implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableListProviders(ctx context.Context, params acp.UnstableListProvidersRequest) (acp.UnstableListProvidersResponse, error) {
-	return acp.UnstableListProvidersResponse{}, acp.NewMethodNotFound(acp.AgentMethodProvidersList)
-}
-
-// UnstableSetProviders implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableSetProviders(ctx context.Context, params acp.UnstableSetProvidersRequest) (acp.UnstableSetProvidersResponse, error) {
-	return acp.UnstableSetProvidersResponse{}, acp.NewMethodNotFound(acp.AgentMethodProvidersSet)
-}
-
-// UnstableCloseSession implements acp.AgentExperimental.
-func (a *exampleAgent) UnstableCloseSession(ctx context.Context, params acp.UnstableCloseSessionRequest) (acp.UnstableCloseSessionResponse, error) {
-	return acp.UnstableCloseSessionResponse{}, acp.NewMethodNotFound(acp.AgentMethodSessionClose)
-}
-
-// Implement acp.AgentConnAware to receive the connection after construction.
-func (a *exampleAgent) SetAgentConnection(conn *acp.AgentSideConnection) { a.conn = conn }
-
-func (a *exampleAgent) Initialize(ctx context.Context, params acp.InitializeRequest) (acp.InitializeResponse, error) {
+func (a *mockAgent) Initialize(ctx context.Context, params acp.InitializeRequest) (acp.InitializeResponse, error) {
 	return acp.InitializeResponse{
 		ProtocolVersion: acp.ProtocolVersionNumber,
 		AgentCapabilities: acp.AgentCapabilities{
-			LoadSession: false,
+			PromptCapabilities:  acp.PromptCapabilities{},
+			SessionCapabilities: acp.SessionCapabilities{},
 		},
 	}, nil
 }
 
-func (a *exampleAgent) NewSession(ctx context.Context, params acp.NewSessionRequest) (acp.NewSessionResponse, error) {
-	sid := randomID()
+func (a *mockAgent) NewSession(ctx context.Context, params acp.NewSessionRequest) (acp.NewSessionResponse, error) {
+	return acp.NewSessionResponse{SessionId: "mock-session"}, nil
+}
+
+func (a *mockAgent) Cancel(ctx context.Context, params acp.CancelNotification) error {
 	a.mu.Lock()
-	a.sessions[sid] = &agentSession{}
+	cancel, ok := a.sessions[string(params.SessionId)]
 	a.mu.Unlock()
-	return acp.NewSessionResponse{SessionId: acp.SessionId(sid)}, nil
-}
-
-func (a *exampleAgent) Authenticate(ctx context.Context, _ acp.AuthenticateRequest) (acp.AuthenticateResponse, error) {
-	return acp.AuthenticateResponse{}, nil
-}
-
-func (a *exampleAgent) LoadSession(ctx context.Context, _ acp.LoadSessionRequest) (acp.LoadSessionResponse, error) {
-	return acp.LoadSessionResponse{}, nil
-}
-
-func (a *exampleAgent) Cancel(ctx context.Context, params acp.CancelNotification) error {
-	a.mu.Lock()
-	s, ok := a.sessions[string(params.SessionId)]
-	a.mu.Unlock()
-	if ok && s != nil && s.cancel != nil {
-		s.cancel()
+	if ok && cancel != nil {
+		cancel()
 	}
 	return nil
 }
 
-func (a *exampleAgent) Prompt(_ context.Context, params acp.PromptRequest) (acp.PromptResponse, error) {
+func (a *mockAgent) Prompt(ctx context.Context, params acp.PromptRequest) (acp.PromptResponse, error) {
 	sid := string(params.SessionId)
+	ctx, cancel := context.WithCancel(ctx)
 	a.mu.Lock()
-	s, ok := a.sessions[sid]
-	a.mu.Unlock()
-	if !ok {
-		return acp.PromptResponse{}, fmt.Errorf("session %s not found", sid)
-	}
-
-	// cancel any previous turn
-	a.mu.Lock()
-	if s.cancel != nil {
-		prev := s.cancel
-		a.mu.Unlock()
-		prev()
-	} else {
-		a.mu.Unlock()
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	a.mu.Lock()
-	s.cancel = cancel
+	a.sessions[sid] = cancel
 	a.mu.Unlock()
 
-	// simulate a full turn with streaming updates and a permission request
-	if err := a.simulateTurn(ctx, sid); err != nil {
-		if ctx.Err() != nil {
-			return acp.PromptResponse{StopReason: acp.StopReasonCancelled}, nil
-		}
-		return acp.PromptResponse{}, err
-	}
+	a.simulateTurn(ctx, params.SessionId, params.Prompt)
+
 	a.mu.Lock()
-	s.cancel = nil
+	delete(a.sessions, sid)
 	a.mu.Unlock()
-	return acp.PromptResponse{StopReason: acp.StopReasonEndTurn}, nil
+	return acp.PromptResponse{}, nil
 }
 
-func (a *exampleAgent) simulateTurn(ctx context.Context, sid string) error {
-	// disclaimer: stream a demo notice so clients see it's the example agent
-	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-		SessionId: acp.SessionId(sid),
-		Update:    acp.UpdateAgentMessageText("ACP Go Example Agent — demo only (no AI model)."),
-	}); err != nil {
-		return err
-	}
-	if err := pause(ctx, 250*time.Millisecond); err != nil {
-		return err
-	}
-	// initial message chunk
-	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-		SessionId: acp.SessionId(sid),
-		Update:    acp.UpdateAgentMessageText("I'll help you with that. Let me start by reading some files to understand the current situation."),
-	}); err != nil {
-		return err
-	}
-	if err := pause(ctx, time.Second); err != nil {
-		return err
-	}
-
-	// send a plan to structure the work
-	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-		SessionId: acp.SessionId(sid),
-		Update: acp.UpdatePlan(
-			acp.PlanEntry{Content: "Read project files", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusPending},
-			acp.PlanEntry{Content: "Modify configuration", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusPending},
-			acp.PlanEntry{Content: "Verify changes", Priority: acp.PlanEntryPriorityMedium, Status: acp.PlanEntryStatusPending},
-		),
-	}); err != nil {
-		return err
-	}
-	if err := pause(ctx, 500*time.Millisecond); err != nil {
-		return err
-	}
-
-	// tool call without permission
-	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-		SessionId: acp.SessionId(sid),
-		Update: acp.StartToolCall(
-			acp.ToolCallId("call_1"),
-			"Reading project files",
-			acp.WithStartKind(acp.ToolKindRead),
-			acp.WithStartStatus(acp.ToolCallStatusPending),
-			acp.WithStartLocations([]acp.ToolCallLocation{{Path: "/project/README.md"}}),
-			acp.WithStartRawInput(map[string]any{"path": "/project/README.md"}),
-		),
-	}); err != nil {
-		return err
-	}
-	if err := pause(ctx, time.Second); err != nil {
-		return err
-	}
-
-	// update tool call completed
-	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-		SessionId: acp.SessionId(sid),
-		Update: acp.UpdateToolCall(
-			acp.ToolCallId("call_1"),
-			acp.WithUpdateStatus(acp.ToolCallStatusCompleted),
-			acp.WithUpdateContent([]acp.ToolCallContent{acp.ToolContent(acp.TextBlock("# My Project\n\nThis is a sample project..."))}),
-			acp.WithUpdateRawOutput(map[string]any{"content": "# My Project\n\nThis is a sample project..."}),
-		),
-	}); err != nil {
-		return err
-	}
-	if err := pause(ctx, time.Second); err != nil {
-		return err
-	}
-
-	// update plan: first task completed, second in progress
-	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-		SessionId: acp.SessionId(sid),
-		Update: acp.UpdatePlan(
-			acp.PlanEntry{Content: "Read project files", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusCompleted},
-			acp.PlanEntry{Content: "Modify configuration", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusInProgress},
-			acp.PlanEntry{Content: "Verify changes", Priority: acp.PlanEntryPriorityMedium, Status: acp.PlanEntryStatusPending},
-		),
-	}); err != nil {
-		return err
-	}
-
-	// more text
-	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-		SessionId: acp.SessionId(sid),
-		Update:    acp.UpdateAgentMessageText(" Now I understand the project structure. I need to make some changes to improve it."),
-	}); err != nil {
-		return err
-	}
-	if err := pause(ctx, time.Second); err != nil {
-		return err
-	}
-
-	// tool call requiring permission
-	if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-		SessionId: acp.SessionId(sid),
-		Update: acp.StartToolCall(
-			acp.ToolCallId("call_2"),
-			"Modifying critical configuration file",
-			acp.WithStartKind(acp.ToolKindEdit),
-			acp.WithStartStatus(acp.ToolCallStatusPending),
-			acp.WithStartLocations([]acp.ToolCallLocation{{Path: "/project/config.json"}}),
-			acp.WithStartRawInput(map[string]any{"path": "/project/config.json", "content": "{\"database\": {\"host\": \"new-host\"}}"}),
-		),
-	}); err != nil {
-		return err
-	}
-
-	// request permission for sensitive operation
-	permResp, err := a.conn.RequestPermission(ctx, acp.RequestPermissionRequest{
-		SessionId: acp.SessionId(sid),
-		ToolCall: acp.ToolCallUpdate{
-			ToolCallId: acp.ToolCallId("call_2"),
-			Title:      acp.Ptr("Modifying critical configuration file"),
-			Kind:       acp.Ptr(acp.ToolKindEdit),
-			Status:     acp.Ptr(acp.ToolCallStatusPending),
-			Locations:  []acp.ToolCallLocation{{Path: "/home/user/project/config.json"}},
-			RawInput:   map[string]any{"path": "/home/user/project/config.json", "content": "{\"database\": {\"host\": \"new-host\"}}"},
-		},
-		Options: []acp.PermissionOption{
-			{Kind: acp.PermissionOptionKindAllowOnce, Name: "Allow this change", OptionId: acp.PermissionOptionId("allow")},
-			{Kind: acp.PermissionOptionKindRejectOnce, Name: "Skip this change", OptionId: acp.PermissionOptionId("reject")},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// handle permission outcome
-	if permResp.Outcome.Cancelled != nil {
-		return nil
-	}
-	if permResp.Outcome.Selected == nil {
-		return fmt.Errorf("unexpected permission outcome")
-	}
-	switch string(permResp.Outcome.Selected.OptionId) {
-	case "allow":
-		if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-			SessionId: acp.SessionId(sid),
-			Update: acp.UpdateToolCall(
-				acp.ToolCallId("call_2"),
-				acp.WithUpdateStatus(acp.ToolCallStatusCompleted),
-				acp.WithUpdateRawOutput(map[string]any{"success": true, "message": "Configuration updated"}),
-				acp.WithUpdateTitle("Modifying critical configuration file"),
-			),
-		}); err != nil {
-			return err
+func (a *mockAgent) simulateTurn(ctx context.Context, sid acp.SessionId, prompt []acp.ContentBlock) {
+	text := ""
+	for _, block := range prompt {
+		if block.Text != nil {
+			text = block.Text.Text
 		}
-		if err := pause(ctx, time.Second); err != nil {
-			return err
-		}
-		if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-			SessionId: acp.SessionId(sid),
-			Update:    acp.UpdateAgentMessageText(" Perfect! I've successfully updated the configuration. The changes have been applied."),
-		}); err != nil {
-			return err
-		}
-
-		// final plan: all complete, plus usage
-		a.sendPlanAndUsage(ctx, sid)
-	case "reject":
-		if err := pause(ctx, time.Second); err != nil {
-			return err
-		}
-		if err := a.conn.SessionUpdate(ctx, acp.SessionNotification{
-			SessionId: acp.SessionId(sid),
-			Update:    acp.UpdateAgentMessageText(" I understand you prefer not to make that change. I'll skip the configuration update."),
-		}); err != nil {
-			return err
-		}
-
-		a.sendPlanAndUsage(ctx, sid)
-	default:
-		return fmt.Errorf("unexpected permission option: %s", permResp.Outcome.Selected.OptionId)
 	}
-	return nil
+
+	n := 10 + rand.Intn(11)
+	steps := makeActions(n)
+	callCounter := 1
+
+	for _, s := range steps {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		time.Sleep(time.Duration(100+rand.Intn(300)) * time.Millisecond)
+
+		switch s.typ {
+		case "think":
+			a.sendUpdate(ctx, sid, acp.SessionNotification{
+				SessionId: sid,
+				Update:    acp.UpdateAgentMessageText(s.thought),
+			})
+
+		case "plan":
+			a.sendUpdate(ctx, sid, acp.SessionNotification{
+				SessionId: sid,
+				Update: acp.SessionUpdate{
+					Plan: &acp.SessionUpdatePlan{
+						Entries: []acp.PlanEntry{
+							{Content: "Analyze: " + text, Status: acp.PlanEntryStatusCompleted},
+							{Content: "Explore codebase", Status: acp.PlanEntryStatusInProgress},
+							{Content: "Make changes", Status: acp.PlanEntryStatusPending},
+							{Content: "Verify results", Status: acp.PlanEntryStatusPending},
+						},
+					},
+				},
+			})
+
+		case "tool":
+			callId := acp.ToolCallId(fmt.Sprintf("call-%d", callCounter))
+			callCounter++
+
+			a.sendUpdate(ctx, sid, acp.SessionNotification{
+				SessionId: sid,
+				Update: acp.StartToolCall(
+					callId,
+					s.label,
+					acp.WithStartKind(acp.ToolKind(s.kind)),
+					acp.WithStartStatus(acp.ToolCallStatusPending),
+					acp.WithStartRawInput(map[string]any{"tool": s.name}),
+				),
+			})
+
+			time.Sleep(200 * time.Millisecond)
+
+			a.sendUpdate(ctx, sid, acp.SessionNotification{
+				SessionId: sid,
+				Update: acp.UpdateToolCall(
+					callId,
+					acp.WithUpdateStatus(acp.ToolCallStatusCompleted),
+					acp.WithUpdateRawOutput(mockToolOutput(s.name)),
+				),
+			})
+
+		case "text":
+			exampleFile := examples[rand.Intn(len(examples))]
+			content, _ := os.ReadFile(exampleFile)
+			lines := strings.Split(string(content), "\n")
+
+			a.sendUpdate(ctx, sid, acp.SessionNotification{
+				SessionId: sid,
+				Update:    acp.UpdateAgentMessageText("Here is the result:\n\n"),
+			})
+			for _, line := range lines {
+				time.Sleep(30 * time.Millisecond)
+				a.sendUpdate(ctx, sid, acp.SessionNotification{
+					SessionId: sid,
+					Update:    acp.UpdateAgentMessageText(line + "\n"),
+				})
+			}
+		}
+	}
 }
 
-func (a *exampleAgent) sendPlanAndUsage(ctx context.Context, sid string) {
-	// final plan: all tasks completed
-	_ = a.conn.SessionUpdate(ctx, acp.SessionNotification{
-		SessionId: acp.SessionId(sid),
-		Update: acp.UpdatePlan(
-			acp.PlanEntry{Content: "Read project files", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusCompleted},
-			acp.PlanEntry{Content: "Modify configuration", Priority: acp.PlanEntryPriorityHigh, Status: acp.PlanEntryStatusCompleted},
-			acp.PlanEntry{Content: "Verify changes", Priority: acp.PlanEntryPriorityMedium, Status: acp.PlanEntryStatusCompleted},
-		),
-	})
-
-	// usage update with token counts and cost
-	_ = a.conn.SessionUpdate(ctx, acp.SessionNotification{
-		SessionId: acp.SessionId(sid),
-		Update: acp.SessionUpdate{
-			UsageUpdate: &acp.SessionUsageUpdate{
-				Used: 2847,
-				Size: 128000,
-				Cost: &acp.Cost{Amount: 0.12, Currency: "USD"},
-			},
-		},
-	})
+func (a *mockAgent) sendUpdate(ctx context.Context, sid acp.SessionId, notif acp.SessionNotification) {
+	if err := a.conn.SessionUpdate(ctx, notif); err != nil {
+		log.Printf("send update error: %v", err)
+	}
 }
 
-func randomID() string {
-	var b [12]byte
-	if _, err := io.ReadFull(rand.Reader, b[:]); err != nil {
-		// fallback to time-based
-		return fmt.Sprintf("sess_%d", time.Now().UnixNano())
-	}
-	return "sess_" + hex.EncodeToString(b[:])
+type action struct {
+	typ     string
+	thought string
+	name    string
+	label   string
+	kind    string
 }
 
-func pause(ctx context.Context, d time.Duration) error {
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-		return nil
+func makeActions(n int) []action {
+	actions := make([]action, 0, n)
+	actions = append(actions, action{typ: "think", thought: thoughtPhrases[rand.Intn(len(thoughtPhrases))]})
+
+	middle := n - 2
+	for i := 0; i < middle; {
+		if rand.Intn(5) == 0 {
+			actions = append(actions, action{typ: "plan"})
+			i++
+			continue
+		}
+		if rand.Intn(3) == 0 {
+			actions = append(actions, action{typ: "think", thought: thoughtPhrases[rand.Intn(len(thoughtPhrases))]})
+			i++
+			continue
+		}
+		t := toolTemplates[rand.Intn(len(toolTemplates))]
+		actions = append(actions, action{typ: "tool", name: t.name, label: t.desc, kind: t.kind})
+		i++
 	}
+	actions = append(actions, action{typ: "text"})
+	return actions
+}
+
+type toolTpl struct {
+	name string
+	kind string
+	desc string
+}
+
+var toolTemplates = []toolTpl{
+	{name: "read_dir", kind: "read", desc: "List directory"},
+	{name: "read_file", kind: "read", desc: "Read file"},
+	{name: "edit_file", kind: "edit", desc: "Edit file"},
+	{name: "bash", kind: "run", desc: "Run command"},
+}
+
+var thoughtPhrases = []string{
+	"Let me analyze this step by step.",
+	"Let me check the relevant files first.",
+	"Looking at the code, I can see what needs to change.",
+	"Let me trace through the logic carefully.",
+	"I should verify the impact of this change.",
+	"Now I understand the issue clearly.",
+	"Let me plan the implementation approach.",
+	"Time to make the actual changes.",
+	"Let me verify the changes compile correctly.",
+}
+
+func mockToolOutput(name string) string {
+	switch name {
+	case "read_dir":
+		return "main.go\nclient/\ntui/\nagent/\nexamples/\nMakefile"
+	case "read_file":
+		return "package main\n\nfunc main() {\n    println(\"hello\")\n}"
+	case "edit_file":
+		return "File updated successfully"
+	case "bash":
+		return "Build succeeded"
+	}
+	return "done"
+}
+
+func (a *mockAgent) ListSessions(ctx context.Context, params acp.ListSessionsRequest) (acp.ListSessionsResponse, error) {
+	return acp.ListSessionsResponse{}, nil
+}
+
+func (a *mockAgent) SetSessionConfigOption(ctx context.Context, params acp.SetSessionConfigOptionRequest) (acp.SetSessionConfigOptionResponse, error) {
+	return acp.SetSessionConfigOptionResponse{}, nil
+}
+
+func (a *mockAgent) SetSessionMode(ctx context.Context, params acp.SetSessionModeRequest) (acp.SetSessionModeResponse, error) {
+	return acp.SetSessionModeResponse{}, nil
 }
 
 func main() {
-	// If args provided, treat them as client program + args to spawn and connect via stdio.
-	// Otherwise, default to stdio (allowing manual wiring or use by another process).
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
-	defer cancel()
-
-	var (
-		out io.Writer = os.Stdout
-		in  io.Reader = os.Stdin
-		cmd *exec.Cmd
-	)
-	if len(os.Args) > 1 {
-		cmd = exec.CommandContext(ctx, os.Args[1], os.Args[2:]...)
-		cmd.Stderr = os.Stderr
-		stdin, _ := cmd.StdinPipe()
-		stdout, _ := cmd.StdoutPipe()
-		if err := cmd.Start(); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to start client: %v\n", err)
-			os.Exit(1)
-		}
-		out = stdin
-		in = stdout
-	}
-
-	ag := newExampleAgent()
-	asc := acp.NewAgentSideConnection(ag, out, in)
-	asc.SetLogger(slog.Default())
-	ag.SetAgentConnection(asc)
-
-	// Block until the peer disconnects.
-	<-asc.Done()
-
-	if cmd != nil && cmd.Process != nil {
-		_ = cmd.Process.Kill()
-	}
+	agent := newMockAgent()
+	conn := acp.NewAgentSideConnection(agent, os.Stdout, os.Stdin)
+	agent.SetAgentConnection(conn)
+	<-conn.Done()
 }

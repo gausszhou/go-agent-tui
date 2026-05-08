@@ -3,13 +3,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 )
 
 func main() {
-	// 获取终端色域配置（自动检测）
-	profile := lipgloss.ColorProfile()
+	profile := termenv.ColorProfile()
 
 	switch profile {
 	case termenv.TrueColor:

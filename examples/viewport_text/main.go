@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // 定义各种样式（无背景色）
@@ -156,12 +156,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		if !m.ready {
 			// 初始化 viewport
-			m.viewport = viewport.New(msg.Width, msg.Height-2) // 留2行给帮助信息
+			m.viewport = viewport.New(viewport.WithWidth(msg.Width), viewport.WithHeight(msg.Height-2)) // 留2行给帮助信息
 			m.viewport.YPosition = 0
 			m.ready = true
 		} else {
-			m.viewport.Width = msg.Width
-			m.viewport.Height = msg.Height - 2
+			m.viewport.SetWidth(msg.Width)
+			m.viewport.SetHeight(msg.Height - 2)
 		}
 
 		// ✅ 关键：设置内容到 viewport（内容已经带有样式）
@@ -172,13 +172,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "up", "k":
-			m.viewport.LineUp(1)
+			m.viewport.ScrollUp(1)
 		case "down", "j":
-			m.viewport.LineDown(1)
+			m.viewport.ScrollDown(1)
 		case "pgup", "ctrl+b":
-			m.viewport.HalfViewUp()
+			m.viewport.HalfPageUp()
 		case "pgdown", "ctrl+f":
-			m.viewport.HalfViewDown()
+			m.viewport.HalfPageDown()
 		case "home", "g":
 			m.viewport.GotoTop()
 		case "end", "G":
@@ -193,9 +193,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
 	if !m.ready {
-		return "\n  Loading..."
+		return tea.NewView("\n  Loading...")
 	}
 
 	// 帮助信息样式（无背景色）
@@ -207,19 +207,15 @@ func (m model) View() string {
 	)
 
 	// 组合：viewport + 帮助栏
-	return lipgloss.JoinVertical(
+	return tea.NewView(lipgloss.JoinVertical(
 		lipgloss.Top,
 		m.viewport.View(),
 		helpText,
-	)
+	))
 }
 
 func main() {
-	p := tea.NewProgram(
-		newModel(),
-		tea.WithAltScreen(),       // 使用备用屏幕
-		tea.WithMouseCellMotion(), // 支持鼠标滚动（可选）
-	)
+	p := tea.NewProgram(newModel())
 
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)

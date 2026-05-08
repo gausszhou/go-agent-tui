@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"image/color"
+
+	"charm.land/lipgloss/v2"
+)
 
 var (
 	ocBg      = lipgloss.Color("#201d1d")
@@ -15,16 +19,16 @@ var (
 	ocDanger  = lipgloss.Color("#ff3b30")
 )
 
-func bg() lipgloss.Color      { return ocBg }
-func surface() lipgloss.Color { return ocSurface }
-func border() lipgloss.Color  { return ocBorder }
-func text() lipgloss.Color    { return ocText }
-func muted() lipgloss.Color   { return ocMuted }
-func dim() lipgloss.Color     { return ocDim }
-func accent() lipgloss.Color  { return ocAccent }
-func success() lipgloss.Color { return ocSuccess }
-func warning() lipgloss.Color { return ocWarning }
-func danger() lipgloss.Color  { return ocDanger }
+func bg() color.Color      { return ocBg }
+func surface() color.Color { return ocSurface }
+func border() color.Color  { return ocBorder }
+func text() color.Color    { return ocText }
+func muted() color.Color   { return ocMuted }
+func dim() color.Color     { return ocDim }
+func accent() color.Color  { return ocAccent }
+func success() color.Color { return ocSuccess }
+func warning() color.Color { return ocWarning }
+func danger() color.Color  { return ocDanger }
 
 func agentLabel() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(accent()).Bold(true)

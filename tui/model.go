@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 	"github.com/coder/acp-go-sdk"
 
 	"github.com/gausszhou/text-ui-research/client"
@@ -104,7 +104,7 @@ func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "enter"))
 
-	vp := viewport.New(80, 20)
+	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 
 	return Model{
 		debug:  debug,
@@ -182,7 +182,7 @@ func (m *Model) addMessage(msg component.ChatMessage) {
 func (m *Model) renderMessages() string {
 	var sb strings.Builder
 	for _, msg := range m.messages {
-		sb.WriteString(msg.Render(m.chatViewport.Width, userLabel(), agentLabel(), thoughtLabel(), toolLabel(), systemLabel()))
+		sb.WriteString(msg.Render(m.chatViewport.Width(), userLabel(), agentLabel(), thoughtLabel(), toolLabel(), systemLabel()))
 		sb.WriteString("\n")
 	}
 	return sb.String()

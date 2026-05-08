@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // 定义各种样式（无背景色）
@@ -348,12 +348,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		if !m.ready {
-			m.viewport = viewport.New(msg.Width, msg.Height-3)
+			m.viewport = viewport.New(viewport.WithWidth(msg.Width), viewport.WithHeight(msg.Height-3))
 			m.viewport.YPosition = 0
 			m.ready = true
 		} else {
-			m.viewport.Width = msg.Width
-			m.viewport.Height = msg.Height - 3
+			m.viewport.SetWidth(msg.Width)
+			m.viewport.SetHeight(msg.Height - 3)
 		}
 		m.needsRefresh = true
 		m.smartRefresh()
@@ -363,13 +363,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "up", "k":
-			m.viewport.LineUp(1)
+			m.viewport.ScrollUp(1)
 		case "down", "j":
-			m.viewport.LineDown(1)
+			m.viewport.ScrollDown(1)
 		case "pgup", "ctrl+b":
-			m.viewport.HalfViewUp()
+			m.viewport.HalfPageUp()
 		case "pgdown", "ctrl+f":
-			m.viewport.HalfViewDown()
+			m.viewport.HalfPageDown()
 		case "home", "g":
 			m.viewport.GotoTop()
 		case "end", "G":
@@ -423,14 +423,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
 	if !m.ready {
-		return "\n  Initializing stream..."
+		return tea.NewView("\n  Initializing stream...")
 	}
 
 	// 如果正在重置或没有内容且流式输出未激活，显示初始状态
 	if m.needReset || (len(m.allContent) == 0 && m.streamActive) {
-		return "\n  Starting stream...\n"
+		return tea.NewView("\n  Starting stream...\n")
 	}
 
 	statusStyle := lipgloss.NewStyle().
@@ -457,22 +457,18 @@ func (m model) View() string {
 		" ↑/↓ 滚动  •  PgUp/PgDown 翻页  •  g/G 顶部/底部  •  s 跳过当前  •  r 重新开始  •  q 退出 ",
 	)
 
-	return lipgloss.JoinVertical(
+	return tea.NewView(lipgloss.JoinVertical(
 		lipgloss.Top,
 		m.viewport.View(),
 		statusText,
 		helpText,
-	)
+	))
 }
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	p := tea.NewProgram(
-		newModel(),
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
+	p := tea.NewProgram(newModel())
 
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/coder/acp-go-sdk"
 
 	"github.com/gausszhou/text-ui-research/client"
@@ -453,7 +453,7 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "up", "k":
 		if m.viewportFocused {
-			m.chatViewport.LineUp(1)
+			m.chatViewport.ScrollUp(1)
 			return m, nil
 		}
 		m.lastKeyTime = time.Now()
@@ -463,7 +463,7 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "down", "j":
 		if m.viewportFocused {
-			m.chatViewport.LineDown(1)
+			m.chatViewport.ScrollDown(1)
 			return m, nil
 		}
 		m.lastKeyTime = time.Now()
@@ -482,8 +482,8 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	switch msg.Button {
-	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
+	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
 		var cmd tea.Cmd
 		m.chatViewport, cmd = m.chatViewport.Update(msg)
 		cmds = append(cmds, cmd)

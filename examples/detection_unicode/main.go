@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 func main() {
@@ -13,7 +13,7 @@ func main() {
 		"你好",       // 纯中文
 		"Hello 👋!", // 混合英文和Emoji
 		"Hello 世界", // 混合英文和中文
-		lipgloss.NewStyle().Foreground(lipgloss.Color(1)).Render("Hello"), // 带ANSI颜色的文本
+		lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Render("Hello"), // 带ANSI颜色的文本
 	}
 
 	for _, s := range testStrings {

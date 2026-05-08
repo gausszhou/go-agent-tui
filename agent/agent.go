@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log"
 	"math/rand"
@@ -13,11 +14,23 @@ import (
 	"github.com/coder/acp-go-sdk"
 )
 
+//go:embed examples/markdown_example.md
+var exampleMD string
+
+//go:embed examples/go_best_practices.md
+var exampleGo string
+
+//go:embed examples/api_design_guide.md
+var exampleAPI string
+
+//go:embed examples/sql_optimization.md
+var exampleSQL string
+
 var examples = []string{
-	"examples/markdown_example.md",
-	"examples/go_best_practices.md",
-	"examples/api_design_guide.md",
-	"examples/sql_optimization.md",
+	exampleMD,
+	exampleGo,
+	exampleAPI,
+	exampleSQL,
 }
 
 type mockAgent struct {
@@ -146,9 +159,8 @@ func (a *mockAgent) simulateTurn(ctx context.Context, sid acp.SessionId, prompt 
 			})
 
 		case "text":
-			exampleFile := examples[rand.Intn(len(examples))]
-			content, _ := os.ReadFile(exampleFile)
-			lines := strings.Split(string(content), "\n")
+			content := examples[rand.Intn(len(examples))]
+			lines := strings.Split(content, "\n")
 
 			a.sendUpdate(ctx, sid, acp.SessionNotification{
 				SessionId: sid,

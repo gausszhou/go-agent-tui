@@ -5,10 +5,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/gausszhou/text-ui-research/tui/layout"
 	overlay "github.com/gausszhou/text-ui-research/tui/overlay"
 )
 
-func (m Model) View() tea.View {
+func (m *Model) View() tea.View {
 	if m.width == 0 || m.height == 0 {
 		return tea.NewView("Initializing...")
 	}
@@ -18,27 +19,33 @@ func (m Model) View() tea.View {
 	switch m.focus {
 	case FocusPermission:
 		fg := m.renderPermissionOverlay()
-		return tea.NewView(overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0))
+		view := tea.NewView(overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0))
+		view.AltScreen = true
+		view.MouseMode = tea.MouseModeAllMotion
+		return view
 	case FocusCommandPanel:
 		fg := m.renderCommandPanelOverlay()
-		return tea.NewView(overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0))
+		view := tea.NewView(overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0))
+		view.AltScreen = true
+		view.MouseMode = tea.MouseModeAllMotion
+		return view
 	case FocusSessionList:
 		fg := m.renderSessionOverlay()
-		return tea.NewView(overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0))
+		view := tea.NewView(overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0))
+		view.AltScreen = true
+		view.MouseMode = tea.MouseModeAllMotion
+		return view
 	}
 	view := tea.NewView(bg)
 	view.AltScreen = true
+	view.MouseMode = tea.MouseModeAllMotion
 	return view
 }
 
-func (m Model) renderMainView() string {
-	leftW := m.width * 68 / 100
-	rightW := m.width - leftW - 1
-	if rightW < 22 {
-		rightW = 22
-		leftW = m.width - rightW - 1
-	}
-	chatH := m.height - 7
+func (m *Model) renderMainView() string {
+	leftW := layout.GetLeftWidth(m.width)
+	rightW := layout.GetRightWidth()
+	chatH := layout.GetChatHeight(m.height)
 
 	left := m.renderLeft(leftW, chatH)
 	right := m.renderRight(rightW)
@@ -46,9 +53,9 @@ func (m Model) renderMainView() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 }
 
-func (m Model) renderLeft(width, chatH int) string {
-	barW := 1
-	vpW := width - barW
+func (m *Model) renderLeft(width, chatH int) string {
+	paddingH := layout.GetLeftPaddingHorizontal()
+	vpW := layout.GetChatWidth(width)
 
 	m.chatViewport.SetWidth(vpW)
 	m.chatViewport.SetHeight(chatH)
@@ -58,7 +65,9 @@ func (m Model) renderLeft(width, chatH int) string {
 	sb := renderScrollbar(chatH, contentLines, m.chatViewport.YOffset())
 	chat := lipgloss.JoinHorizontal(lipgloss.Top, vp, sb)
 
-	input := m.renderInput(width)
+	inputW := layout.GetInputWidth(width)
+	inputH := layout.GetInputHeight()
+	input := m.renderInput(inputW, inputH)
 
 	help := "Enter Send  Ctrl+P Commands  Ctrl+C Quit"
 	if m.promptRunning {
@@ -72,10 +81,12 @@ func (m Model) renderLeft(width, chatH int) string {
 	m.statusBar.Style = statusBarBg()
 	status := m.statusBar.View()
 
-	return lipgloss.JoinVertical(lipgloss.Left, chat, input, lipgloss.NewStyle().Height(1).Render(""), status)
+	spacingH := layout.GetSpacingHeight()
+	content := lipgloss.JoinVertical(lipgloss.Left, chat, input, lipgloss.NewStyle().Height(spacingH).Render(""), status)
+	return lipgloss.NewStyle().Width(width).Padding(0, paddingH).Render(content)
 }
 
-func (m Model) renderRight(width int) string {
+func (m *Model) renderRight(width int) string {
 	return lipgloss.NewStyle().Width(width).Height(m.height).
 		Background(lipgloss.Color("#141414")).
 		Render(lipgloss.NewStyle().Width(width).Padding(0, 1).
@@ -84,9 +95,10 @@ func (m Model) renderRight(width int) string {
 			Render(m.todoList.View()))
 }
 
-func (m Model) renderInput(width int) string {
+func (m *Model) renderInput(width, height int) string {
 	promptWidth := 2
 	m.textarea.SetWidth(width - promptWidth)
+	m.textarea.SetHeight(height)
 
 	promptColor := muted()
 	if m.focus == FocusInput {
@@ -94,10 +106,10 @@ func (m Model) renderInput(width int) string {
 	}
 	m.textarea.Prompt = lipgloss.NewStyle().Width(promptWidth).Foreground(promptColor).Render("┃ ")
 
-	return lipgloss.NewStyle().Width(width).Render(m.textarea.View())
+	return lipgloss.NewStyle().Width(width).Height(height).Render(m.textarea.View())
 }
 
-func (m Model) renderPermissionOverlay() string {
+func (m *Model) renderPermissionOverlay() string {
 	w := min(m.width-10, 64)
 	m.questionBox.Width = w
 	m.questionBox.Style = overlayBox()
@@ -121,7 +133,7 @@ func (m Model) renderPermissionOverlay() string {
 	return overlayBox().MaxWidth(m.width - 10).Render(ov)
 }
 
-func (m Model) renderCommandPanelOverlay() string {
+func (m *Model) renderCommandPanelOverlay() string {
 	var sb strings.Builder
 
 	title := lipgloss.NewStyle().Foreground(accent()).Bold(true).Render("Commands")
@@ -154,7 +166,7 @@ func (m Model) renderCommandPanelOverlay() string {
 	return overlayBox().Width(50).Render(content)
 }
 
-func (m Model) renderSessionOverlay() string {
+func (m *Model) renderSessionOverlay() string {
 	var sb strings.Builder
 
 	title := lipgloss.NewStyle().Foreground(accent()).Bold(true).Render("Sessions")
@@ -195,7 +207,9 @@ func renderScrollbar(height, totalLines, yOffset int) string {
 	if totalLines <= height {
 		for i := 0; i < height; i++ {
 			sb.WriteString(trackStyle.Render("█"))
-			sb.WriteByte('\n')
+			if i < height-1 {
+				sb.WriteByte('\n')
+			}
 		}
 		return sb.String()
 	}
@@ -210,7 +224,9 @@ func renderScrollbar(height, totalLines, yOffset int) string {
 		} else {
 			sb.WriteString(trackStyle.Render("█"))
 		}
-		sb.WriteByte('\n')
+		if i < height-1 {
+			sb.WriteByte('\n')
+		}
 	}
 	return sb.String()
 }

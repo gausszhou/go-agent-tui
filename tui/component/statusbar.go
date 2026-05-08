@@ -1,7 +1,7 @@
 package component
 
 import (
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 type StatusBar struct {

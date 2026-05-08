@@ -1,6 +1,6 @@
 package component
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 type Loading struct {
 	Frame int

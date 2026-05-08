@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/term"
 )
 
@@ -63,7 +63,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.input.Width = msg.Width - 2
+		m.input.SetWidth(msg.Width - 2)
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -93,13 +93,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
 	if m.quitting {
-		return "\n再见！👋\n"
+		return tea.NewView("\n再见！👋\n")
 	}
 
 	if m.width == 0 {
-		return "Loading..."
+		return tea.NewView("Loading...")
 	}
 
 	divider := dimStyle.Render(strings.Repeat("─", m.width))
@@ -120,12 +120,12 @@ func (m model) View() string {
 	inputLine := fmt.Sprintf("%s%s", blueColor.Render("> "), m.input.View())
 
 	// 组合：历史消息 + 下横线 + 输入框 + 下横线
-	return fmt.Sprintf("%s%s\n%s\n%s",
+	return tea.NewView(fmt.Sprintf("%s%s\n%s\n%s",
 		content.String(),
 		divider,
 		inputLine,
 		divider,
-	)
+	))
 }
 
 func main() {

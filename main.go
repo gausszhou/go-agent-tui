@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	acpsdk "github.com/coder/acp-go-sdk"
 	"github.com/spf13/cobra"
 
@@ -82,7 +82,7 @@ func run(debug bool) error {
 	go acp.Run(ctx, conn)
 
 	model := tui.NewModel(debug, logger, acp, cmd, string(newSess.SessionId), ctx, cancel, inCh, outCh)
-	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	p := tea.NewProgram(model)
 	if _, err := p.Run(); err != nil {
 		return err
 	}

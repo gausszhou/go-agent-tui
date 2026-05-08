@@ -2,20 +2,20 @@
 
 A terminal user interface for interacting with AI agents via the [ACP protocol](https://github.com/coder/acp-go-sdk).
 
-Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) v1 and [Lip Gloss](https://github.com/charmbracelet/lipgloss) v1.
+Built with [Bubble Tea](https://charm.land/bubbletea/v2) v2 and [Lip Gloss](https://charm.land/lipgloss/v2) v2.
 
-![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)
+![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)
 
 ## Requirements
 
-- Go 1.22+
+- Go 1.25+
 - `opencode` CLI in PATH (provides the ACP agent subprocess)
 
 ## Build
 
 ```bash
-go build -o bin/client.exe .              # app
-go build -o bin/agent.exe ./agent         # standalone example agent
+go build -o client.exe .              # app
+go build -o agent.exe ./agent         # standalone example agent
 ```
 
 ## Usage

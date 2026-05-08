@@ -3,13 +3,14 @@ package tui
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	overlay "github.com/gausszhou/text-ui-research/tui/overlay"
 )
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	if m.width == 0 || m.height == 0 {
-		return "Initializing..."
+		return tea.NewView("Initializing...")
 	}
 
 	bg := m.renderMainView()
@@ -17,16 +18,17 @@ func (m Model) View() string {
 	switch m.focus {
 	case FocusPermission:
 		fg := m.renderPermissionOverlay()
-		return overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0)
+		return tea.NewView(overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0))
 	case FocusCommandPanel:
 		fg := m.renderCommandPanelOverlay()
-		return overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0)
+		return tea.NewView(overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0))
 	case FocusSessionList:
 		fg := m.renderSessionOverlay()
-		return overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0)
+		return tea.NewView(overlay.Composite(fg, bg, overlay.Center, overlay.Center, 0, 0))
 	}
-
-	return bg
+	view := tea.NewView(bg)
+	view.AltScreen = true
+	return view
 }
 
 func (m Model) renderMainView() string {
@@ -48,12 +50,12 @@ func (m Model) renderLeft(width, chatH int) string {
 	barW := 1
 	vpW := width - barW
 
-	m.chatViewport.Width = vpW
-	m.chatViewport.Height = chatH
+	m.chatViewport.SetWidth(vpW)
+	m.chatViewport.SetHeight(chatH)
 	vp := m.chatViewport.View()
 
 	contentLines := m.chatViewport.TotalLineCount()
-	sb := renderScrollbar(chatH, contentLines, m.chatViewport.YOffset)
+	sb := renderScrollbar(chatH, contentLines, m.chatViewport.YOffset())
 	chat := lipgloss.JoinHorizontal(lipgloss.Top, vp, sb)
 
 	input := m.renderInput(width)

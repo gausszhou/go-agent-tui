@@ -15,6 +15,7 @@ import (
 
 	"github.com/gausszhou/text-ui-research/client"
 	"github.com/gausszhou/text-ui-research/tui/component"
+	"github.com/gausszhou/text-ui-research/tui/layout"
 )
 
 type FocusArea int
@@ -94,9 +95,9 @@ type Model struct {
 	viewportDirty       bool
 }
 
-func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.Cmd, sessionID string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) Model {
+func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.Cmd, sessionID string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {
 	ta := textarea.New()
-	ta.Placeholder = "Type a message... (Enter to send, Shift+Enter for newline)"
+	ta.Placeholder = "Type a message... (Enter to Send, Shift+Enter for newline)"
 	ta.SetWidth(80)
 	ta.SetHeight(5)
 	ta.Focus()
@@ -106,7 +107,7 @@ func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.
 
 	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 
-	return Model{
+	m := &Model{
 		debug:  debug,
 		logger: logger,
 
@@ -140,9 +141,10 @@ func NewModel(debug bool, logger *slog.Logger, acp *client.ACPClient, cmd *exec.
 
 		statusText: "Ready",
 	}
+	return m
 }
 
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return tea.Batch(spinnerTick(), renderTick())
 }
 
@@ -182,13 +184,23 @@ func (m *Model) addMessage(msg component.ChatMessage) {
 func (m *Model) renderMessages() string {
 	var sb strings.Builder
 	for _, msg := range m.messages {
-		sb.WriteString(msg.Render(m.chatViewport.Width(), userLabel(), agentLabel(), thoughtLabel(), toolLabel(), systemLabel()))
+		sb.WriteString(msg.Render(m.chatViewport.Width()))
 		sb.WriteString("\n")
 	}
 	return sb.String()
 }
 
 func (m *Model) updateChatViewport() {
+	leftW := layout.GetLeftWidth(m.width)
+	chatH := layout.GetChatHeight(m.height)
+	vpW := layout.GetChatWidth(leftW)
+	m.chatViewport.SetWidth(vpW)
+	m.chatViewport.SetHeight(chatH)
+
+	inputW := layout.GetInputWidth(leftW)
+	inputH := layout.GetInputHeight()
+	m.textarea.SetWidth(inputW)
+	m.textarea.SetHeight(inputH)
 	m.chatViewport.SetContent(m.renderMessages())
 	m.chatViewport.GotoBottom()
 }

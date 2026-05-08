@@ -12,11 +12,17 @@ import (
 	"github.com/gausszhou/text-ui-research/tui/component"
 )
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.PasteMsg:
+		var cmd tea.Cmd
+		m.textarea, cmd = m.textarea.Update(msg)
+		return m, cmd
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.viewportDirty = true
 		return m, nil
 
 	case spinnerTickMsg:
@@ -46,7 +52,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
+func (m *Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
 	if ev.Update != nil {
 		return m.handleSessionUpdate(*ev.Update)
 	}
@@ -136,7 +142,7 @@ func mapPlanStatus(s acp.PlanEntryStatus) component.TodoStatus {
 	}
 }
 
-func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
+func (m *Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 	switch {
 	case u.UserMessageChunk != nil:
 		m.logger.Debug("session update: user message chunk")
@@ -234,7 +240,7 @@ func (m Model) handleSessionUpdate(u acp.SessionUpdate) (tea.Model, tea.Cmd) {
 	return m, m.waitForOutput()
 }
 
-func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.focus {
 	case FocusPermission:
 		return m.handlePermissionKey(msg)
@@ -248,7 +254,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handlePermissionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handlePermissionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		m.questionBox.Up()
@@ -301,7 +307,7 @@ func (m Model) handlePermissionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		m.sessionList.Up()
@@ -341,7 +347,7 @@ func (m Model) handleSessionListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleCommandPanelKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleCommandPanelKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.commandPanelIdx > 0 {
@@ -380,7 +386,7 @@ func (m Model) handleCommandPanelKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key := msg.String(); key {
 	case "enter", "ctrl+e":
 		if m.promptRunning {
@@ -479,7 +485,7 @@ func (m Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {

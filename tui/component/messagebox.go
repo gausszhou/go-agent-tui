@@ -2,9 +2,9 @@ package component
 
 import (
 	"fmt"
-	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/gausszhou/text-ui-research/tui/theme"
 )
 
 type MessageRole int
@@ -25,70 +25,35 @@ type ChatMessage struct {
 	ToolStatus    string
 }
 
-func (m ChatMessage) Render(width int, userStyle, agentStyle, thoughtStyle, toolStyle, systemStyle lipgloss.Style) string {
+func (m ChatMessage) Render(width int) string {
 	prefix := ""
 	var style lipgloss.Style
 
 	switch m.Role {
 	case RoleUser:
 		prefix = "You"
-		style = userStyle
+		style = theme.StyleUser
 	case RoleAgent:
 		prefix = "Agent"
-		style = agentStyle
+		style = theme.StyleAgent
 	case RoleThought:
 		prefix = "Thought"
-		style = thoughtStyle
+		style = theme.StyleThought
 	case RoleTool:
 		prefix = fmt.Sprintf("Tool: %s (%s)", m.ToolCallTitle, m.ToolStatus)
-		style = toolStyle
+		style = theme.StyleTool
 	case RoleSystem:
 		prefix = "System"
-		style = systemStyle
+		style = theme.StyleSystem
 	}
 
 	contentWidth := width - 4
 	if contentWidth < 20 {
 		contentWidth = 20
 	}
-	wrapped := wordWrap(m.Content, contentWidth)
 
-	var sb strings.Builder
-	sb.WriteString(style.Render(prefix))
-	sb.WriteString("\n")
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#9a9898")).PaddingLeft(2).Width(contentWidth).Render(wrapped))
+	prefixStr := style.Render(prefix)
+	contentStr := theme.StyleContent.PaddingLeft(2).Width(contentWidth).Render(m.Content)
 
-	return sb.String()
-}
-
-func wordWrap(text string, width int) string {
-	if width <= 0 {
-		return text
-	}
-	var result strings.Builder
-	for _, line := range strings.Split(text, "\n") {
-		if result.Len() > 0 {
-			result.WriteByte('\n')
-		}
-		if len(line) == 0 {
-			continue
-		}
-		remaining := line
-		for len(remaining) > width {
-			idx := strings.LastIndexFunc(remaining[:width+1], func(r rune) bool { return r == ' ' })
-			if idx <= 0 {
-				idx = width
-			}
-			result.WriteString(strings.TrimRight(remaining[:idx], " "))
-			result.WriteByte('\n')
-			remaining = remaining[idx:]
-			if len(remaining) > 0 && remaining[0] == ' ' {
-				remaining = remaining[1:]
-			}
-		}
-		if len(remaining) > 0 {
-			result.WriteString(strings.TrimRight(remaining, " "))
-		}
-	}
-	return result.String()
+	return prefixStr + "\n" + contentStr
 }

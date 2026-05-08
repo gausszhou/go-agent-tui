@@ -4,57 +4,25 @@ import (
 	"image/color"
 
 	"charm.land/lipgloss/v2"
+	"github.com/gausszhou/text-ui-research/tui/theme"
 )
 
-var (
-	ocBg      = lipgloss.Color("#201d1d")
-	ocSurface = lipgloss.Color("#302c2c")
-	ocBorder  = lipgloss.Color("#646262")
-	ocText    = lipgloss.Color("#fdfcfc")
-	ocMuted   = lipgloss.Color("#9a9898")
-	ocDim     = lipgloss.Color("#6e6e73")
-	ocAccent  = lipgloss.Color("#007aff")
-	ocSuccess = lipgloss.Color("#30d158")
-	ocWarning = lipgloss.Color("#ff9f0a")
-	ocDanger  = lipgloss.Color("#ff3b30")
-)
-
-func bg() color.Color      { return ocBg }
-func surface() color.Color { return ocSurface }
-func border() color.Color  { return ocBorder }
-func text() color.Color    { return ocText }
-func muted() color.Color   { return ocMuted }
-func dim() color.Color     { return ocDim }
-func accent() color.Color  { return ocAccent }
-func success() color.Color { return ocSuccess }
-func warning() color.Color { return ocWarning }
-func danger() color.Color  { return ocDanger }
-
-func agentLabel() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(accent()).Bold(true)
-}
-
-func userLabel() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(success()).Bold(true)
-}
-
-func thoughtLabel() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(dim()).Italic(true)
-}
-
-func toolLabel() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(warning()).Bold(true)
-}
-
-func systemLabel() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(muted())
-}
+func bg() color.Color      { return theme.ThemeBg }
+func surface() color.Color { return theme.ThemeSurface }
+func border() color.Color  { return theme.ThemeBorder }
+func text() color.Color    { return theme.ThemeText }
+func muted() color.Color   { return theme.ThemeMuted }
+func dim() color.Color     { return theme.ThemeDim }
+func accent() color.Color  { return theme.ThemeAccent }
+func success() color.Color { return theme.ThemeSuccess }
+func warning() color.Color { return theme.ThemeWarning }
+func danger() color.Color  { return theme.ThemeDanger }
 
 func overlayBox() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(warning()).
-		Background(lipgloss.Color("#1e1e1e")).
+		Background(theme.ThemeBgOverlay).
 		Padding(1, 2)
 }
 
@@ -68,6 +36,6 @@ func helpLabel() lipgloss.Style {
 
 func statusBarBg() lipgloss.Style {
 	return lipgloss.NewStyle().
-		Background(lipgloss.Color("#0c0c0c")).
+		Background(theme.ThemeBgDark).
 		Foreground(muted())
 }

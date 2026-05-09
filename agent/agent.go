@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -90,6 +89,25 @@ func (a *mockAgent) Prompt(ctx context.Context, params acp.PromptRequest) (acp.P
 	return acp.PromptResponse{}, nil
 }
 
+func RandomSplit(s string) []string {
+	runes := []rune(s)
+	if len(runes) == 0 {
+		return nil
+	}
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	var parts []string
+	for i := 0; i < len(runes); {
+		maxLen := len(runes) - i
+		if maxLen > 10 {
+			maxLen = 10
+		}
+		l := rng.Intn(maxLen) + 1
+		parts = append(parts, string(runes[i:i+l]))
+		i += l
+	}
+	return parts
+}
+
 func (a *mockAgent) simulateTurn(ctx context.Context, sid acp.SessionId, prompt []acp.ContentBlock) {
 	text := ""
 	for _, block := range prompt {
@@ -112,10 +130,13 @@ func (a *mockAgent) simulateTurn(ctx context.Context, sid acp.SessionId, prompt 
 
 		switch s.typ {
 		case "think":
-			a.sendUpdate(ctx, sid, acp.SessionNotification{
-				SessionId: sid,
-				Update:    acp.UpdateAgentMessageText(s.thought),
-			})
+			for _, char := range RandomSplit(s.thought) {
+				time.Sleep(time.Duration(10+rand.Intn(30)) * time.Millisecond)
+				a.sendUpdate(ctx, sid, acp.SessionNotification{
+					SessionId: sid,
+					Update:    acp.UpdateAgentThoughtText(char),
+				})
+			}
 
 		case "plan":
 			a.sendUpdate(ctx, sid, acp.SessionNotification{
@@ -160,17 +181,11 @@ func (a *mockAgent) simulateTurn(ctx context.Context, sid acp.SessionId, prompt 
 
 		case "text":
 			content := examples[rand.Intn(len(examples))]
-			lines := strings.Split(content, "\n")
-
-			a.sendUpdate(ctx, sid, acp.SessionNotification{
-				SessionId: sid,
-				Update:    acp.UpdateAgentMessageText("Here is the result:\n\n"),
-			})
-			for _, line := range lines {
-				time.Sleep(30 * time.Millisecond)
+			for _, char := range RandomSplit(content) {
+				time.Sleep(time.Duration(10+rand.Intn(30)) * time.Millisecond)
 				a.sendUpdate(ctx, sid, acp.SessionNotification{
 					SessionId: sid,
-					Update:    acp.UpdateAgentMessageText(line + "\n"),
+					Update:    acp.UpdateAgentMessageText(char),
 				})
 			}
 		}

@@ -18,6 +18,7 @@ import (
 
 	"github.com/gausszhou/text-ui-research/client"
 	"github.com/gausszhou/text-ui-research/tui/component"
+	"github.com/gausszhou/text-ui-research/tui/layout"
 	"github.com/gausszhou/text-ui-research/tui/theme"
 )
 
@@ -48,7 +49,7 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.
 	ta := textarea.New()
 	ta.Placeholder = "Type a message... (Enter to Send)"
 	ta.SetWidth(80)
-	ta.SetHeight(5)
+	ta.SetHeight(layout.InputHeight)
 	ta.Focus()
 	ta.CharLimit = 0
 	ta.ShowLineNumbers = false
@@ -68,6 +69,8 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.
 		cmd:          cmd,
 		ctx:          ctx,
 		cancel:       cancel,
+		width:        80,
+		height:       24,
 		textarea:     ta,
 		chatViewport: vp,
 		statusText:   "Ready",
@@ -82,9 +85,13 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		if msg.Width < layout.MinWidth || msg.Height < layout.MinHeight {
+			return m, nil
+		}
 		m.width = msg.Width
 		m.height = msg.Height
 		m.updateSizes()
+		m.chatViewport.SetContent(m.renderMessages())
 		return m, nil
 
 	case tea.KeyMsg:
@@ -104,10 +111,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() tea.View {
-	if m.width == 0 || m.height == 0 {
-		return tea.NewView("Initializing...")
-	}
-
 	chat := m.chatViewport.View()
 	input := m.renderInput()
 
@@ -117,8 +120,9 @@ func (m *Model) View() tea.View {
 	} else {
 		left = "✓ " + left
 	}
+	pad := 2 * layout.PaddingHorizontal
 	status := theme.StatusBar().
-		Width(m.width - 4).
+		Width(m.width - pad).
 		Render(left)
 
 	content := lipgloss.JoinVertical(
@@ -131,7 +135,7 @@ func (m *Model) View() tea.View {
 	view := tea.NewView(theme.PureBlack().
 		Width(m.width).
 		Height(m.height).
-		Padding(0, 2).
+		Padding(0, layout.PaddingHorizontal).
 		Render(content))
 	view.AltScreen = true
 	view.MouseMode = tea.MouseModeAllMotion
@@ -263,15 +267,10 @@ func (m *Model) handleOutput(ev client.OutputEvent) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) updateSizes() {
-	chatW := m.width - 4
-	chatH := m.height - 8
-	m.chatViewport.SetWidth(chatW)
-	m.chatViewport.SetHeight(chatH)
-	m.chatViewport.Style = lipgloss.NewStyle()
-
-	inputW := m.width - 4
-	m.textarea.SetWidth(inputW)
-	m.textarea.SetHeight(5)
+	m.chatViewport.SetWidth(layout.GetChatWidth(m.width))
+	m.chatViewport.SetHeight(layout.GetChatHeight(m.height))
+	m.textarea.SetWidth(layout.GetInputWidth(m.width))
+	m.textarea.SetHeight(layout.InputHeight)
 }
 
 func (m *Model) renderMessages() string {

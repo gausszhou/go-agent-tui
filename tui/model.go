@@ -41,6 +41,7 @@ type Model struct {
 	promptRunning bool
 	statusText    string
 	lastKeyTime   time.Time
+	spinner       component.Loading
 }
 
 func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {
@@ -70,6 +71,7 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.
 		textarea:     ta,
 		chatViewport: vp,
 		statusText:   "Ready",
+		spinner:      component.NewLoading(loadingSpinner()),
 	}
 }
 
@@ -93,6 +95,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case outputEventMsg:
 		return m.handleOutput(msg.event)
+
+	case loadingTickMsg:
+		m.spinner = m.spinner.Tick()
+		return m, spinnerTick()
 	}
 	return m, nil
 }
@@ -104,9 +110,16 @@ func (m *Model) View() tea.View {
 
 	chat := m.chatViewport.View()
 	input := m.renderInput()
+
+	left := m.statusText
+	if m.loading {
+		left = m.spinner.View() + " " + left
+	} else {
+		left = "✓ " + left
+	}
 	status := theme.StatusBar().
 		Width(m.width - 4).
-		Render(m.statusText)
+		Render(left)
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -147,7 +160,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.statusText = "Processing..."
 		m.inputCh <- client.InputCommand{Type: client.CmdPrompt, Text: text}
 		m.chatViewport.SetContent(m.renderMessages())
-		return m, waitForOutput(m.outputCh)
+		return m, tea.Batch(waitForOutput(m.outputCh), spinnerTick())
 
 	case "ctrl+c":
 		m.cleanup()
@@ -289,6 +302,14 @@ func waitForOutput(ch chan client.OutputEvent) tea.Cmd {
 
 type outputEventMsg struct {
 	event client.OutputEvent
+}
+
+type loadingTickMsg struct{}
+
+func spinnerTick() tea.Cmd {
+	return tea.Tick(80*time.Millisecond, func(t time.Time) tea.Msg {
+		return loadingTickMsg{}
+	})
 }
 
 var _ tea.Model = (*Model)(nil)

@@ -46,16 +46,17 @@ type Model struct {
 }
 
 func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {
+	initW := 80
 	ta := textarea.New()
 	ta.Placeholder = "Type a message... (Enter to Send)"
-	ta.SetWidth(80)
+	ta.SetWidth(layout.GetInputWidth(initW))
 	ta.SetHeight(layout.InputHeight)
 	ta.Focus()
 	ta.CharLimit = 0
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "enter"))
 
-	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	vp := viewport.New(viewport.WithWidth(layout.GetChatWidth(initW)), viewport.WithHeight(20))
 
 	styles := textarea.DefaultDarkStyles()
 	styles.Focused.Base = styles.Focused.Base.Background(theme.ThemeInputBg)
@@ -69,7 +70,7 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.
 		cmd:          cmd,
 		ctx:          ctx,
 		cancel:       cancel,
-		width:        80,
+		width:        initW,
 		height:       24,
 		textarea:     ta,
 		chatViewport: vp,

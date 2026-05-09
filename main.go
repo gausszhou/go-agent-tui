@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
 	acpsdk "github.com/coder/acp-go-sdk"
@@ -28,13 +27,7 @@ func run() error {
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	exePath, _ := os.Executable()
-	agentPath := filepath.Join(filepath.Dir(exePath), "agent.exe")
-	if _, err := os.Stat(agentPath); err != nil {
-		agentPath = "./bin/agent.exe"
-	}
-
-	cmd := exec.CommandContext(ctx, agentPath)
+	cmd := exec.CommandContext(ctx, "agent.exe")
 
 	events := make(chan client.OutputEvent, 100)
 

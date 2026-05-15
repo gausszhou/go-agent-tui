@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -29,6 +31,18 @@ func (m *Model) View() tea.View {
 	}
 
 	return view
+}
+
+func (m *Model) renderMessages() string {
+	w := m.chatViewport.Width()
+	var sb strings.Builder
+	for i, msg := range m.messages {
+		if i > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(msg.Render(w))
+	}
+	return sb.String()
 }
 
 func (m *Model) renderStatus() string {

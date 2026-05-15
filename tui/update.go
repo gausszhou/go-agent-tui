@@ -1,8 +1,13 @@
 package tui
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
 	"charm.land/bubbles/v2/cursor"
 	tea "charm.land/bubbletea/v2"
+	"github.com/coder/acp-go-sdk"
 
 	"github.com/gausszhou/bubblecode/client"
 	"github.com/gausszhou/bubblecode/tui/component"
@@ -114,6 +119,61 @@ func (m *Model) handleBlink(msg cursor.BlinkMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.textarea, cmd = m.textarea.Update(msg)
 	return m, cmd
+}
+
+func (m *Model) processUpdate(update acp.SessionUpdate) {
+	switch {
+	case update.AgentMessageChunk != nil && update.AgentMessageChunk.Content.Text != nil:
+		m.appendOrNewMessage(roleAgent, update.AgentMessageChunk.Content.Text.Text)
+
+	case update.AgentThoughtChunk != nil && update.AgentThoughtChunk.Content.Text != nil:
+		m.appendOrNewMessage(roleThought, update.AgentThoughtChunk.Content.Text.Text)
+
+	case update.ToolCall != nil:
+		tc := update.ToolCall
+		inputJSON, _ := json.Marshal(tc.RawInput)
+		m.messages = append(m.messages, component.Message{Role: roleTool, Content: tc.Title + "\n" + string(inputJSON)})
+
+	case update.ToolCallUpdate != nil:
+		tu := update.ToolCallUpdate
+		status := "completed"
+		if tu.Status != nil {
+			status = string(*tu.Status)
+		}
+		for i := len(m.messages) - 1; i >= 0; i-- {
+			if m.messages[i].Role == roleTool {
+				if tu.RawOutput != nil {
+					if output := fmt.Sprintf("%v", tu.RawOutput); output != "" {
+						m.messages[i].Content += "\n" + output
+					}
+				}
+				m.messages[i].Status = status
+				break
+			}
+		}
+
+	case update.Plan != nil:
+		var lines []string
+		for _, e := range update.Plan.Entries {
+			mark := " "
+			switch e.Status {
+			case acp.PlanEntryStatusCompleted:
+				mark = "✓"
+			case acp.PlanEntryStatusInProgress:
+				mark = "→"
+			}
+			lines = append(lines, fmt.Sprintf("[%s] %s", mark, e.Content))
+		}
+		m.messages = append(m.messages, component.Message{Role: rolePlan, Content: strings.Join(lines, "\n")})
+	}
+}
+
+func (m *Model) appendOrNewMessage(role, content string) {
+	if len(m.messages) > 0 && m.messages[len(m.messages)-1].Role == role {
+		m.messages[len(m.messages)-1].Content += content
+	} else {
+		m.messages = append(m.messages, component.Message{Role: role, Content: content})
+	}
 }
 
 func (m *Model) sendPrompt() (tea.Model, tea.Cmd) {

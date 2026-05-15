@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"charm.land/glamour/v2"
+	"charm.land/glamour/v2/styles"
 )
 
 var (
@@ -11,7 +12,7 @@ var (
 	mdCache   = map[int]*glamour.TermRenderer{}
 )
 
-func getRenderer(width int) *glamour.TermRenderer {
+func getRenderer(width int, bgColor string) *glamour.TermRenderer {
 	mdCacheMu.Lock()
 	defer mdCacheMu.Unlock()
 
@@ -19,8 +20,19 @@ func getRenderer(width int) *glamour.TermRenderer {
 		return r
 	}
 
+	cfg := styles.DarkStyleConfig
+	bg := bgColor
+	cfg.Document.StylePrimitive.BackgroundColor = &bg
+	cfg.H1.StylePrimitive.BackgroundColor = &bg
+	cfg.Code.StylePrimitive.BackgroundColor = &bg
+	cfg.CodeBlock.StylePrimitive.BackgroundColor = &bg
+	if cfg.CodeBlock.Chroma != nil {
+		cfg.CodeBlock.Chroma.Background.BackgroundColor = &bg
+		cfg.CodeBlock.Chroma.Error.BackgroundColor = &bg
+	}
+
 	r, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle("dark"),
+		glamour.WithStyles(cfg),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {
@@ -31,8 +43,8 @@ func getRenderer(width int) *glamour.TermRenderer {
 	return r
 }
 
-func RenderMarkdown(content string, width int) string {
-	r := getRenderer(width)
+func RenderMarkdown(content string, width int, bgColor string) string {
+	r := getRenderer(width, bgColor)
 	if r == nil {
 		return content
 	}

@@ -1,4 +1,4 @@
-.PHONY: build build-client build-agent clean
+.PHONY: build build-client build-agent clean fmt lint vet check
 
 build: build-client build-agent
 
@@ -7,6 +7,17 @@ build-client:
 
 build-agent:
 	go build -o bin/agent.exe ./agent
+
+fmt:
+	go fmt ./...
+
+lint:
+	golangci-lint run ./...
+
+vet:
+	go vet ./...
+
+check: fmt vet lint
 
 clean:
 	rm -rf bin/

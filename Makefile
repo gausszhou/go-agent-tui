@@ -6,7 +6,7 @@ build-client:
 	go build -o bin/client.exe .
 
 build-agent:
-	go build -o bin/agent.exe ./agent
+	go build -o bin/agent.exe ./agent/cmd
 
 fmt:
 	go fmt ./...

@@ -2,6 +2,7 @@ package component
 
 import (
 	"charm.land/lipgloss/v2"
+	"github.com/gausszhou/text-ui-research/tui/theme"
 )
 
 type StatusBar struct {
@@ -14,9 +15,7 @@ type StatusBar struct {
 
 func NewStatusBar() StatusBar {
 	return StatusBar{
-		Style: lipgloss.NewStyle().
-			Background(lipgloss.Color("#0c0c0c")).
-			Foreground(lipgloss.Color("#9a9898")),
+		Style: theme.StatusBarBg(),
 	}
 }
 

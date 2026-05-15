@@ -53,7 +53,7 @@ func (m ChatMessage) Render(width int) string {
 	}
 
 	prefixStr := style.Render(prefix)
-	contentStr := theme.StyleContent.PaddingLeft(2).Width(contentWidth).Render(m.Content)
+	contentStr := theme.StyleContent.Width(contentWidth).PaddingLeft(2).Render(m.Content)
 
 	return prefixStr + "\n" + contentStr
 }

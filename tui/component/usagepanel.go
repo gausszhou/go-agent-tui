@@ -1,6 +1,9 @@
 package component
 
-import "charm.land/lipgloss/v2"
+import (
+	"github.com/gausszhou/text-ui-research/tui/theme"
+	"charm.land/lipgloss/v2"
+)
 
 type UsageInfo struct {
 	ModelName  string
@@ -11,9 +14,9 @@ type UsageInfo struct {
 
 func NewUsageInfo() UsageInfo {
 	return UsageInfo{
-		TitleStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#007aff")).Bold(true),
-		LabelStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#6e6e73")),
-		ValueStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#fdfcfc")),
+		TitleStyle: theme.UsageTitleStyle,
+		LabelStyle: theme.UsageLabelStyle,
+		ValueStyle: theme.UsageValueStyle,
 	}
 }
 

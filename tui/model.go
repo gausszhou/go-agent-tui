@@ -76,7 +76,7 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.
 		textarea:     ta,
 		chatViewport: vp,
 		statusText:   "Ready",
-		spinner:      component.NewLoading(loadingSpinner()),
+		spinner:      component.NewLoading(theme.LoadingSpinner()),
 	}
 }
 

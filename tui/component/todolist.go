@@ -11,7 +11,7 @@ import (
 type TodoStatus int
 
 const (
-	TodoPending    TodoStatus = iota
+	TodoPending TodoStatus = iota
 	TodoInProgress
 	TodoCompleted
 )

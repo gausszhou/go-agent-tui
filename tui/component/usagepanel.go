@@ -1,8 +1,8 @@
 package component
 
 import (
-	"github.com/gausszhou/text-ui-research/tui/theme"
 	"charm.land/lipgloss/v2"
+	"github.com/gausszhou/text-ui-research/tui/theme"
 )
 
 type UsageInfo struct {

@@ -1,6 +1,8 @@
 package component
 
 import (
+	"charm.land/lipgloss/v2"
+
 	"github.com/gausszhou/bubblecode/tui/theme"
 )
 
@@ -28,10 +30,5 @@ func (m Message) Render(w int) string {
 		fgColor = theme.ThemeSuccess
 	}
 
-	role := m.Role
-	if role == "thought" {
-		role = "thinking"
-	}
-
-	return theme.ChatBg(w).Foreground(fgColor).Render(m.Content)
+	return lipgloss.NewStyle().Width(w).Foreground(fgColor).Render(m.Content)
 }

@@ -24,8 +24,6 @@ var (
 
 	ThemeBgDark    = lipgloss.Color("#0c0c0c")
 	ThemeBgOverlay = lipgloss.Color("#1e1e1e")
-	ThemeInputBg   = lipgloss.Color("#000000")
-	ThemeChatBg    = lipgloss.Color("#000000")
 )
 
 func BaseStyle() lipgloss.Style {
@@ -58,20 +56,8 @@ func BorderStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(ThemeBorder)
 }
 
-func PureBlack() lipgloss.Style {
-	return lipgloss.NewStyle().Background(lipgloss.Color("#000000")).Foreground(ThemeText)
-}
-
 func StatusBar() lipgloss.Style {
-	return lipgloss.NewStyle().Background(ThemeBgDark).Foreground(ThemeMuted)
-}
-
-func NoBg() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(ThemeText)
-}
-
-func ChatBg(w int) lipgloss.Style {
-	return lipgloss.NewStyle().Background(ThemeChatBg).Width(w)
+	return lipgloss.NewStyle().Foreground(ThemeMuted)
 }
 
 var (

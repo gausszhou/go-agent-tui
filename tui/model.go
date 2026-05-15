@@ -55,6 +55,7 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.
 	ta.CharLimit = 0
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "enter"))
+	ta.Prompt = theme.AccentStyle().Render("┃ ")
 
 	vp := viewport.New(viewport.WithWidth(layout.GetChatWidth(initW)), viewport.WithHeight(20))
 
@@ -80,7 +81,7 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.
 }
 
 func (m *Model) Init() tea.Cmd {
-	return nil
+	return tea.Batch(waitForOutput(m.outputCh), spinnerTick())
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -144,7 +145,6 @@ func (m *Model) View() tea.View {
 }
 
 func (m *Model) renderInput() string {
-	m.textarea.Prompt = theme.AccentStyle().Render("┃ ")
 	return m.textarea.View()
 }
 
@@ -163,9 +163,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.promptRunning = true
 		m.loading = true
 		m.statusText = "Processing..."
-		m.inputCh <- client.InputCommand{Type: client.CmdPrompt, Text: text}
 		m.chatViewport.SetContent(m.renderMessages())
-		return m, tea.Batch(waitForOutput(m.outputCh), spinnerTick())
+		return m, tea.Batch(sendInput(m.inputCh, client.InputCommand{Type: client.CmdPrompt, Text: text}), waitForOutput(m.outputCh), spinnerTick())
 
 	case "ctrl+c":
 		m.cleanup()
@@ -188,9 +187,13 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.MouseWheelMsg:
-		var cmd tea.Cmd
-		m.chatViewport, cmd = m.chatViewport.Update(msg)
-		return m, cmd
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			m.chatViewport.ScrollUp(3)
+		case tea.MouseWheelDown:
+			m.chatViewport.ScrollDown(3)
+		}
+		return m, nil
 	}
 	return m, nil
 }
@@ -290,21 +293,32 @@ func (m *Model) cleanup() {
 	m.cancel()
 }
 
-func waitForOutput(ch chan client.OutputEvent) tea.Cmd {
-	return func() tea.Msg {
-		ev, ok := <-ch
-		if !ok {
-			return nil
-		}
-		return outputEventMsg{event: ev}
-	}
-}
-
 type outputEventMsg struct {
 	event client.OutputEvent
 }
 
+type channelClosedMsg struct{}
+
 type loadingTickMsg struct{}
+
+type inputSentMsg struct{}
+
+func sendInput(ch chan client.InputCommand, cmd client.InputCommand) tea.Cmd {
+	return func() tea.Msg {
+		ch <- cmd
+		return inputSentMsg{}
+	}
+}
+
+func waitForOutput(ch chan client.OutputEvent) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-ch
+		if !ok {
+			return channelClosedMsg{}
+		}
+		return outputEventMsg{event: ev}
+	}
+}
 
 func spinnerTick() tea.Cmd {
 	return tea.Tick(80*time.Millisecond, func(t time.Time) tea.Msg {

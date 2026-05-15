@@ -24,7 +24,7 @@ var (
 
 	ThemeBgDark    = lipgloss.Color("#0c0c0c")
 	ThemeBgOverlay = lipgloss.Color("#1e1e1e")
-	ThemeInputBg   = lipgloss.Color("#1a1a1a")
+	ThemeInputBg   = lipgloss.Color("#000000")
 	ThemeChatBg    = lipgloss.Color("#000000")
 )
 

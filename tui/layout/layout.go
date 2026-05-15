@@ -4,19 +4,28 @@ const (
 	InputHeight       = 5
 	StatusBarHeight   = 1
 	SpacingHeight     = 1
-	PaddingHorizontal = 1
+	PaddingHorizontal = 2
+	MinWidth          = 40
+	MinHeight         = 12
 )
 
+func max1(n int) int {
+	if n < 1 {
+		return 1
+	}
+	return n
+}
+
 func GetChatWidth(totalWidth int) int {
-	return totalWidth - PaddingHorizontal*2
+	return max1(totalWidth - PaddingHorizontal*2)
 }
 
 func GetChatHeight(totalHeight int) int {
-	return totalHeight - InputHeight - SpacingHeight - StatusBarHeight
+	return max1(totalHeight - InputHeight - SpacingHeight - StatusBarHeight)
 }
 
 func GetInputWidth(totalWidth int) int {
-	return totalWidth - PaddingHorizontal*2
+	return max1(totalWidth - PaddingHorizontal*2)
 }
 
 func GetInputHeight() int {

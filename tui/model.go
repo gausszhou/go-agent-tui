@@ -18,6 +18,7 @@ import (
 
 	"github.com/gausszhou/text-ui-research/client"
 	"github.com/gausszhou/text-ui-research/tui/component"
+	"github.com/gausszhou/text-ui-research/tui/layout"
 	"github.com/gausszhou/text-ui-research/tui/theme"
 )
 
@@ -45,16 +46,18 @@ type Model struct {
 }
 
 func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {
+	initW := 80
 	ta := textarea.New()
 	ta.Placeholder = "Type a message... (Enter to Send)"
-	ta.SetWidth(80)
-	ta.SetHeight(5)
+	ta.SetWidth(layout.GetInputWidth(initW))
+	ta.SetHeight(layout.InputHeight)
 	ta.Focus()
 	ta.CharLimit = 0
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "enter"))
+	ta.Prompt = theme.AccentStyle().Render("┃ ")
 
-	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
+	vp := viewport.New(viewport.WithWidth(layout.GetChatWidth(initW)), viewport.WithHeight(20))
 
 	styles := textarea.DefaultDarkStyles()
 	styles.Focused.Base = styles.Focused.Base.Background(theme.ThemeInputBg)
@@ -68,6 +71,8 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.
 		cmd:          cmd,
 		ctx:          ctx,
 		cancel:       cancel,
+		width:        initW,
+		height:       24,
 		textarea:     ta,
 		chatViewport: vp,
 		statusText:   "Ready",
@@ -76,15 +81,19 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, sessionID string, ctx context.
 }
 
 func (m *Model) Init() tea.Cmd {
-	return nil
+	return tea.Batch(waitForOutput(m.outputCh), spinnerTick())
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		if msg.Width < layout.MinWidth || msg.Height < layout.MinHeight {
+			return m, nil
+		}
 		m.width = msg.Width
 		m.height = msg.Height
 		m.updateSizes()
+		m.chatViewport.SetContent(m.renderMessages())
 		return m, nil
 
 	case tea.KeyMsg:
@@ -104,10 +113,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() tea.View {
-	if m.width == 0 || m.height == 0 {
-		return tea.NewView("Initializing...")
-	}
-
 	chat := m.chatViewport.View()
 	input := m.renderInput()
 
@@ -117,8 +122,9 @@ func (m *Model) View() tea.View {
 	} else {
 		left = "✓ " + left
 	}
+	pad := 2 * layout.PaddingHorizontal
 	status := theme.StatusBar().
-		Width(m.width - 4).
+		Width(m.width - pad).
 		Render(left)
 
 	content := lipgloss.JoinVertical(
@@ -131,7 +137,7 @@ func (m *Model) View() tea.View {
 	view := tea.NewView(theme.PureBlack().
 		Width(m.width).
 		Height(m.height).
-		Padding(0, 2).
+		Padding(0, layout.PaddingHorizontal).
 		Render(content))
 	view.AltScreen = true
 	view.MouseMode = tea.MouseModeAllMotion
@@ -139,7 +145,6 @@ func (m *Model) View() tea.View {
 }
 
 func (m *Model) renderInput() string {
-	m.textarea.Prompt = theme.AccentStyle().Render("┃ ")
 	return m.textarea.View()
 }
 
@@ -158,9 +163,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.promptRunning = true
 		m.loading = true
 		m.statusText = "Processing..."
-		m.inputCh <- client.InputCommand{Type: client.CmdPrompt, Text: text}
 		m.chatViewport.SetContent(m.renderMessages())
-		return m, tea.Batch(waitForOutput(m.outputCh), spinnerTick())
+		return m, tea.Batch(sendInput(m.inputCh, client.InputCommand{Type: client.CmdPrompt, Text: text}), waitForOutput(m.outputCh), spinnerTick())
 
 	case "ctrl+c":
 		m.cleanup()
@@ -183,9 +187,13 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.MouseWheelMsg:
-		var cmd tea.Cmd
-		m.chatViewport, cmd = m.chatViewport.Update(msg)
-		return m, cmd
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			m.chatViewport.ScrollUp(3)
+		case tea.MouseWheelDown:
+			m.chatViewport.ScrollDown(3)
+		}
+		return m, nil
 	}
 	return m, nil
 }
@@ -263,15 +271,10 @@ func (m *Model) handleOutput(ev client.OutputEvent) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) updateSizes() {
-	chatW := m.width - 4
-	chatH := m.height - 8
-	m.chatViewport.SetWidth(chatW)
-	m.chatViewport.SetHeight(chatH)
-	m.chatViewport.Style = lipgloss.NewStyle()
-
-	inputW := m.width - 4
-	m.textarea.SetWidth(inputW)
-	m.textarea.SetHeight(5)
+	m.chatViewport.SetWidth(layout.GetChatWidth(m.width))
+	m.chatViewport.SetHeight(layout.GetChatHeight(m.height))
+	m.textarea.SetWidth(layout.GetInputWidth(m.width))
+	m.textarea.SetHeight(layout.InputHeight)
 }
 
 func (m *Model) renderMessages() string {
@@ -290,21 +293,32 @@ func (m *Model) cleanup() {
 	m.cancel()
 }
 
-func waitForOutput(ch chan client.OutputEvent) tea.Cmd {
-	return func() tea.Msg {
-		ev, ok := <-ch
-		if !ok {
-			return nil
-		}
-		return outputEventMsg{event: ev}
-	}
-}
-
 type outputEventMsg struct {
 	event client.OutputEvent
 }
 
+type channelClosedMsg struct{}
+
 type loadingTickMsg struct{}
+
+type inputSentMsg struct{}
+
+func sendInput(ch chan client.InputCommand, cmd client.InputCommand) tea.Cmd {
+	return func() tea.Msg {
+		ch <- cmd
+		return inputSentMsg{}
+	}
+}
+
+func waitForOutput(ch chan client.OutputEvent) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-ch
+		if !ok {
+			return channelClosedMsg{}
+		}
+		return outputEventMsg{event: ev}
+	}
+}
 
 func spinnerTick() tea.Cmd {
 	return tea.Tick(80*time.Millisecond, func(t time.Time) tea.Msg {

@@ -30,5 +30,10 @@ func (m Message) Render(w int) string {
 		fgColor = theme.ThemeSuccess
 	}
 
-	return lipgloss.NewStyle().Width(w).Foreground(fgColor).Render(m.Content)
+	content := m.Content
+	if m.Role == "agent" {
+		content = RenderMarkdown(content, w)
+	}
+
+	return lipgloss.NewStyle().Width(w).Foreground(fgColor).Render(content)
 }

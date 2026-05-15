@@ -14,6 +14,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		return m.handleResize(msg)
 
+	case tea.KeyPressMsg:
+		if msg.Key().Mod == tea.ModCtrl && msg.Key().Code == 'c' {
+			m.cleanup()
+			return m, tea.Quit
+		}
+		return m.handleKey(msg)
+
+	case tea.KeyReleaseMsg:
+		return m, nil
+
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 

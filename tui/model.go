@@ -16,10 +16,10 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/coder/acp-go-sdk"
 
-	"github.com/gausszhou/text-ui-research/client"
-	"github.com/gausszhou/text-ui-research/tui/component"
-	"github.com/gausszhou/text-ui-research/tui/layout"
-	"github.com/gausszhou/text-ui-research/tui/theme"
+	"github.com/gausszhou/bubblecode/client"
+	"github.com/gausszhou/bubblecode/tui/component"
+	"github.com/gausszhou/bubblecode/tui/layout"
+	"github.com/gausszhou/bubblecode/tui/theme"
 )
 
 type Model struct {

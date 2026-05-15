@@ -6,7 +6,7 @@ import (
 
 	"github.com/coder/acp-go-sdk"
 
-	"github.com/gausszhou/text-ui-research/agent"
+	"github.com/gausszhou/bubblecode/agent"
 )
 
 func main() {

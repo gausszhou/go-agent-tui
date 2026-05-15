@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/gausszhou/text-ui-research/tui/theme"
+	"github.com/gausszhou/bubblecode/tui/theme"
 )
 
 type SessionItem struct {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"charm.land/lipgloss/v2"
-	"github.com/gausszhou/text-ui-research/tui/theme"
+	"github.com/gausszhou/bubblecode/tui/theme"
 )
 
 type MessageRole int

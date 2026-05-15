@@ -1,7 +1,7 @@
 package component
 
 import (
-	"github.com/gausszhou/text-ui-research/tui/theme"
+	"github.com/gausszhou/bubblecode/tui/theme"
 )
 
 type Message struct {

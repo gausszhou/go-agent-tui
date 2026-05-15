@@ -1,4 +1,4 @@
-# text-ui-research
+# bubblecode
 
 TUI for AI agents via the [ACP protocol](https://github.com/coder/acp-go-sdk) (`opencode acp`).
 
@@ -21,7 +21,7 @@ go build -o bin/agent.exe ./agent   # standalone example agent
 
 ```bash
 go run .                              # requires `opencode` in PATH
-go run . --debug                      # log to ./text-ui-research.log in current directory
+go run . --debug                      # log to ./bubblecode.log in current directory
 go run ./agent                        # example agent, connects via stdio
 ```
 

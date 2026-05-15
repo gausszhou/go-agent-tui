@@ -4,14 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 
 	tea "charm.land/bubbletea/v2"
 	acpsdk "github.com/coder/acp-go-sdk"
 	"github.com/spf13/cobra"
 
-	"github.com/gausszhou/text-ui-research/client"
-	"github.com/gausszhou/text-ui-research/tui"
+	"github.com/gausszhou/bubblecode/client"
+	"github.com/gausszhou/bubblecode/tui"
 )
 
 func runTUI(cmd *cobra.Command) error {
@@ -20,7 +21,11 @@ func runTUI(cmd *cobra.Command) error {
 
 	logger := slog.New(slog.NewTextHandler(cmd.ErrOrStderr(), &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	agentCmd := exec.CommandContext(ctx, "agent.exe")
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+	agentCmd := exec.CommandContext(ctx, execPath, "acp")
 
 	events := make(chan client.OutputEvent, 100)
 

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/gausszhou/bubblecode/tui/theme"
 )
 
 type QuestionBox struct {
@@ -27,10 +26,10 @@ func NewQuestionBox(title, message string, options []string, width int) Question
 		Options:       options,
 		SelectedIdx:   0,
 		Width:         width,
-		Style:         theme.QuestionBoxStyle,
-		ActiveStyle:   theme.QuestionBoxActiveStyle,
-		InactiveStyle: theme.QuestionBoxInactiveStyle,
-		TitleStyle:    theme.QuestionBoxTitleStyle,
+		Style:         lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#ff9f0a")).Padding(1, 2),
+		ActiveStyle:   lipgloss.NewStyle().Foreground(lipgloss.Color("#fdfcfc")).Background(lipgloss.Color("#007aff")).Padding(0, 1),
+		InactiveStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#9a9898")).Padding(0, 1),
+		TitleStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#ff9f0a")).Bold(true),
 	}
 }
 
@@ -39,7 +38,7 @@ func (q QuestionBox) View() string {
 
 	sb.WriteString(q.TitleStyle.Render(q.Title))
 	sb.WriteString("\n\n")
-	sb.WriteString(theme.QuestionBoxMessageStyle.Render(q.Message))
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#fdfcfc")).Render(q.Message))
 	sb.WriteString("\n\n")
 
 	for i, opt := range q.Options {

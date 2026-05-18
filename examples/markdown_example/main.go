@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"charm.land/glamour/v2"
+	"github.com/charmbracelet/glamour"
 )
 
 func getCurrentFilePath() string {

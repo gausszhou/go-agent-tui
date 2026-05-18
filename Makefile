@@ -1,45 +1,12 @@
-.PHONY: build test clean install build-all build-linux build-darwin build-windows lint fmt vet
+.PHONY: build build-client build-agent clean
 
-BINARY_NAME=bubblecode
-DIST_DIR=bin
+build: build-client build-agent
 
-build:
-	CGO_ENABLED=0 go build -ldflags="-s -w" -o $(DIST_DIR)/$(BINARY_NAME) .
+build-client:
+	go build -o bin/client.exe .
 
-test:
-	go test ./...
+build-agent:
+	go build -o bin/agent.exe ./agent
 
 clean:
-	rm -rf $(DIST_DIR)
-
-install:
-	@echo "Installing $(BINARY_NAME)..."
-	CGO_ENABLED=0 go install -ldflags="-s -w" .
-	@echo "$(BINARY_NAME) installed successfully to $$(go env GOPATH)/bin"
-
-build-all: build-linux build-darwin build-windows
-
-build-linux:
-	mkdir -p $(DIST_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 .
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(BINARY_NAME)-linux-arm64 .
-
-build-darwin:
-	mkdir -p $(DIST_DIR)
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 .
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 .
-
-build-windows:
-	mkdir -p $(DIST_DIR)
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(BINARY_NAME)-windows-amd64.exe .
-	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o $(DIST_DIR)/$(BINARY_NAME)-windows-arm64.exe .
-
-lint:
-	@which golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	golangci-lint run ./...
-
-fmt:
-	go fmt ./...
-
-vet:
-	go vet ./...
+	rm -rf bin/

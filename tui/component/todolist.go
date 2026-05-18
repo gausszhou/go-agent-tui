@@ -5,13 +5,12 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/gausszhou/bubblecode/tui/theme"
 )
 
 type TodoStatus int
 
 const (
-	TodoPending TodoStatus = iota
+	TodoPending    TodoStatus = iota
 	TodoInProgress
 	TodoCompleted
 )
@@ -37,13 +36,13 @@ type TodoList struct {
 func NewTodoList(title string) TodoList {
 	return TodoList{
 		Title:         title,
-		TitleStyle:    theme.TodoTitleStyle,
+		TitleStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("#007aff")).Bold(true),
 		PendingIcon:   "○",
 		ProgressIcon:  "◐",
 		CompleteIcon:  "●",
-		PendingStyle:  theme.TodoPendingStyle,
-		ProgressStyle: theme.TodoProgressStyle,
-		CompleteStyle: theme.TodoCompleteStyle,
+		PendingStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("#6e6e73")),
+		ProgressStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#ff9f0a")),
+		CompleteStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#30d158")),
 	}
 }
 
@@ -53,7 +52,7 @@ func (tl TodoList) View() string {
 	sb.WriteString("\n")
 
 	if len(tl.Items) == 0 {
-		sb.WriteString(theme.TodoEmptyStyle.Render("No tasks"))
+		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#6e6e73")).PaddingLeft(2).Render("No tasks"))
 		return sb.String()
 	}
 

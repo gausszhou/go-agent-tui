@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"charm.land/lipgloss/v2"
-	"github.com/gausszhou/bubblecode/tui/theme"
+	"github.com/gausszhou/text-ui-research/tui/theme"
 )
 
 type MessageRole int
@@ -53,7 +53,7 @@ func (m ChatMessage) Render(width int) string {
 	}
 
 	prefixStr := style.Render(prefix)
-	contentStr := theme.StyleContent.Width(contentWidth).PaddingLeft(2).Render(m.Content)
+	contentStr := theme.StyleContent.PaddingLeft(2).Width(contentWidth).Render(m.Content)
 
 	return prefixStr + "\n" + contentStr
 }

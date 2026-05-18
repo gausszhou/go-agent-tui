@@ -1,11 +1,12 @@
-package agent
+package main
 
 import (
 	"context"
 	_ "embed"
 	"fmt"
-	"log/slog"
+	"log"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
@@ -35,11 +36,10 @@ type mockAgent struct {
 	conn     *acp.AgentSideConnection
 	sessions map[string]context.CancelFunc
 	mu       sync.Mutex
-	logger   *slog.Logger
 }
 
-func NewMockAgent(logger *slog.Logger) *mockAgent {
-	return &mockAgent{sessions: make(map[string]context.CancelFunc), logger: logger}
+func newMockAgent() *mockAgent {
+	return &mockAgent{sessions: make(map[string]context.CancelFunc)}
 }
 
 func (a *mockAgent) SetAgentConnection(conn *acp.AgentSideConnection) {
@@ -194,7 +194,7 @@ func (a *mockAgent) simulateTurn(ctx context.Context, sid acp.SessionId, prompt 
 
 func (a *mockAgent) sendUpdate(ctx context.Context, sid acp.SessionId, notif acp.SessionNotification) {
 	if err := a.conn.SessionUpdate(ctx, notif); err != nil {
-		a.logger.Error("send update error", "error", err)
+		log.Printf("send update error: %v", err)
 	}
 }
 
@@ -279,4 +279,11 @@ func (a *mockAgent) SetSessionConfigOption(ctx context.Context, params acp.SetSe
 
 func (a *mockAgent) SetSessionMode(ctx context.Context, params acp.SetSessionModeRequest) (acp.SetSessionModeResponse, error) {
 	return acp.SetSessionModeResponse{}, nil
+}
+
+func main() {
+	agent := newMockAgent()
+	conn := acp.NewAgentSideConnection(agent, os.Stdout, os.Stdin)
+	agent.SetAgentConnection(conn)
+	<-conn.Done()
 }

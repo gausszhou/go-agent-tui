@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/gausszhou/bubblecode/tui/theme"
 )
 
 type SessionItem struct {
@@ -27,10 +26,10 @@ type SessionList struct {
 func NewSessionList(title string) SessionList {
 	return SessionList{
 		Title:       title,
-		TitleStyle:  theme.SessionListTitleStyle,
-		ActiveStyle: theme.SessionActiveStyle,
-		NormalStyle: theme.SessionNormalStyle,
-		SelectStyle: theme.SessionSelectStyle,
+		TitleStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("#007aff")).Bold(true),
+		ActiveStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#30d158")),
+		NormalStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#9a9898")),
+		SelectStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#fdfcfc")).Background(lipgloss.Color("#007aff")).Padding(0, 1),
 	}
 }
 
@@ -40,7 +39,7 @@ func (sl SessionList) View() string {
 	sb.WriteString("\n")
 
 	if len(sl.Sessions) == 0 {
-		sb.WriteString(theme.SessionEmptyStyle.Render("No sessions"))
+		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#6e6e73")).PaddingLeft(2).Render("No sessions"))
 		return sb.String()
 	}
 

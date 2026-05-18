@@ -1,4 +1,4 @@
-# bubblecode
+# text-ui-research
 
 A terminal user interface for interacting with AI agents via the [ACP protocol](https://github.com/coder/acp-go-sdk).
 

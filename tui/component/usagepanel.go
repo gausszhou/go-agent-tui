@@ -1,9 +1,6 @@
 package component
 
-import (
-	"charm.land/lipgloss/v2"
-	"github.com/gausszhou/bubblecode/tui/theme"
-)
+import "charm.land/lipgloss/v2"
 
 type UsageInfo struct {
 	ModelName  string
@@ -14,9 +11,9 @@ type UsageInfo struct {
 
 func NewUsageInfo() UsageInfo {
 	return UsageInfo{
-		TitleStyle: theme.UsageTitleStyle,
-		LabelStyle: theme.UsageLabelStyle,
-		ValueStyle: theme.UsageValueStyle,
+		TitleStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#007aff")).Bold(true),
+		LabelStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#6e6e73")),
+		ValueStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#fdfcfc")),
 	}
 }
 

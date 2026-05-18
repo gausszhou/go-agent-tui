@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/gausszhou/bubblecode/tui/theme"
 )
 
 type Command struct {
@@ -22,9 +21,9 @@ type CommandPanel struct {
 func NewCommandPanel(commands []Command) CommandPanel {
 	return CommandPanel{
 		Commands:  commands,
-		Style:     theme.CommandPanelStyle,
-		KeyStyle:  theme.CommandKeyStyle,
-		DescStyle: theme.CommandDescStyle,
+		Style:     lipgloss.NewStyle().Padding(0, 1),
+		KeyStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("#007aff")).Bold(true),
+		DescStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("#6e6e73")),
 	}
 }
 

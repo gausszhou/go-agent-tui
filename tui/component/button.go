@@ -1,6 +1,9 @@
 package component
 
-import "charm.land/lipgloss/v2"
+import (
+	"charm.land/lipgloss/v2"
+	"github.com/gausszhou/bubblecode/tui/theme"
+)
 
 type Button struct {
 	Label   string
@@ -12,8 +15,8 @@ type Button struct {
 func NewButton(label string) Button {
 	return Button{
 		Label:  label,
-		Normal: lipgloss.NewStyle().Foreground(lipgloss.Color("#9a9898")).Padding(0, 1),
-		Focus:  lipgloss.NewStyle().Foreground(lipgloss.Color("#fdfcfc")).Background(lipgloss.Color("#007aff")).Padding(0, 1),
+		Normal: theme.ButtonNormalStyle,
+		Focus:  theme.ButtonFocusStyle,
 	}
 }
 

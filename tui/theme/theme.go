@@ -24,8 +24,6 @@ var (
 
 	ThemeBgDark    = lipgloss.Color("#0c0c0c")
 	ThemeBgOverlay = lipgloss.Color("#1e1e1e")
-	ThemeInputBg   = lipgloss.Color("#000000")
-	ThemeChatBg    = lipgloss.Color("#000000")
 )
 
 func BaseStyle() lipgloss.Style {
@@ -58,20 +56,8 @@ func BorderStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(ThemeBorder)
 }
 
-func PureBlack() lipgloss.Style {
-	return lipgloss.NewStyle().Background(lipgloss.Color("#000000")).Foreground(ThemeText)
-}
-
 func StatusBar() lipgloss.Style {
-	return lipgloss.NewStyle().Background(ThemeBgDark).Foreground(ThemeMuted)
-}
-
-func NoBg() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(ThemeText)
-}
-
-func ChatBg(w int) lipgloss.Style {
-	return lipgloss.NewStyle().Background(ThemeChatBg).Width(w)
+	return lipgloss.NewStyle().Foreground(ThemeMuted)
 }
 
 var (
@@ -81,4 +67,57 @@ var (
 	StyleTool    = lipgloss.NewStyle().Foreground(ThemeTool).Bold(true)
 	StyleSystem  = lipgloss.NewStyle().Foreground(ThemeSystem)
 	StyleContent = lipgloss.NewStyle().Foreground(ThemeMuted)
+)
+
+func OverlayBox() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(ThemeWarning).
+		Background(ThemeBgOverlay).
+		Padding(1, 2)
+}
+
+func LoadingSpinner() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(ThemeAccent)
+}
+
+func HelpLabel() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(ThemeDim).Padding(0, 1)
+}
+
+func StatusBarBg() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Background(ThemeBgDark).
+		Foreground(ThemeMuted)
+}
+
+var (
+	TodoTitleStyle    = lipgloss.NewStyle().Foreground(ThemeAccent).Bold(true)
+	TodoPendingStyle  = lipgloss.NewStyle().Foreground(ThemeDim)
+	TodoProgressStyle = lipgloss.NewStyle().Foreground(ThemeWarning)
+	TodoCompleteStyle = lipgloss.NewStyle().Foreground(ThemeSuccess)
+	TodoEmptyStyle    = lipgloss.NewStyle().Foreground(ThemeDim).PaddingLeft(2)
+
+	QuestionBoxStyle         = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(ThemeWarning).Padding(1, 2)
+	QuestionBoxTitleStyle    = lipgloss.NewStyle().Foreground(ThemeWarning).Bold(true)
+	QuestionBoxActiveStyle   = lipgloss.NewStyle().Foreground(ThemeText).Background(ThemeAccent).Padding(0, 1)
+	QuestionBoxInactiveStyle = lipgloss.NewStyle().Foreground(ThemeMuted).Padding(0, 1)
+	QuestionBoxMessageStyle  = lipgloss.NewStyle().Foreground(ThemeText)
+
+	ButtonNormalStyle = lipgloss.NewStyle().Foreground(ThemeMuted).Padding(0, 1)
+	ButtonFocusStyle  = lipgloss.NewStyle().Foreground(ThemeText).Background(ThemeAccent).Padding(0, 1)
+
+	UsageTitleStyle = lipgloss.NewStyle().Foreground(ThemeAccent).Bold(true)
+	UsageLabelStyle = lipgloss.NewStyle().Foreground(ThemeDim)
+	UsageValueStyle = lipgloss.NewStyle().Foreground(ThemeText)
+
+	CommandPanelStyle = lipgloss.NewStyle().Padding(0, 1)
+	CommandKeyStyle   = lipgloss.NewStyle().Foreground(ThemeAccent).Bold(true)
+	CommandDescStyle  = lipgloss.NewStyle().Foreground(ThemeDim)
+
+	SessionListTitleStyle = lipgloss.NewStyle().Foreground(ThemeAccent).Bold(true)
+	SessionActiveStyle    = lipgloss.NewStyle().Foreground(ThemeSuccess)
+	SessionNormalStyle    = lipgloss.NewStyle().Foreground(ThemeMuted)
+	SessionSelectStyle    = lipgloss.NewStyle().Foreground(ThemeText).Background(ThemeAccent).Padding(0, 1)
+	SessionEmptyStyle     = lipgloss.NewStyle().Foreground(ThemeDim).PaddingLeft(2)
 )

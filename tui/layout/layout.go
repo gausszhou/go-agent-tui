@@ -1,6 +1,8 @@
 package layout
 
 const (
+	InitWidth         = 80
+	InitHeight        = 24
 	InputHeight       = 5
 	StatusBarHeight   = 1
 	SpacingHeight     = 1

@@ -52,7 +52,7 @@ print(result)
 
 ```json
 {
-    "name": "text-ui-research",
+    "name": "bubblecode",
     "version": "1.0.0",
     "description": "A TUI application for AI agents",
     "dependencies": {

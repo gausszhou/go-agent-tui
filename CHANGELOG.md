@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to text-ui-research will be documented in this file.
+All notable changes to bubblecode will be documented in this file.
 
 ## [Unreleased]
 

@@ -71,6 +71,7 @@ var (
 
 func OverlayBox() lipgloss.Style {
 	return lipgloss.NewStyle().
+		Width(60).
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(ThemeWarning).
 		Background(ThemeBgOverlay).

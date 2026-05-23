@@ -46,6 +46,8 @@ type Model struct {
 	loading       bool
 	statusText    string
 	spinner       component.Loading
+
+	showCommands bool
 }
 
 func NewModel(logger *slog.Logger, cmd *exec.Cmd, _ string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {

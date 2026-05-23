@@ -71,7 +71,7 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, _ string, ctx context.Context,
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(waitForOutput(m.outputCh), textarea.Blink, spinnerTick())
+	return tea.Batch(waitForOutput(m.outputCh), textarea.Blink, spinnerTick(), pollResize())
 }
 
 func (m *Model) refreshChat() {
@@ -121,6 +121,14 @@ type channelClosedMsg struct{}
 type loadingTickMsg struct{}
 
 type inputSentMsg struct{}
+
+type resizePollMsg struct{}
+
+func pollResize() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
+		return resizePollMsg{}
+	})
+}
 
 func sendInput(ch chan client.InputCommand, cmd client.InputCommand) tea.Cmd {
 	return func() tea.Msg {

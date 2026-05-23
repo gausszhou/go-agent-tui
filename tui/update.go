@@ -20,17 +20,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleResize(msg)
 
 	case tea.KeyPressMsg:
-		if msg.Key().Mod == tea.ModCtrl && msg.Key().Code == 'c' {
-			m.cleanup()
-			return m, tea.Quit
-		}
 		return m.handleKey(msg)
 
 	case tea.KeyReleaseMsg:
 		return m, nil
-
-	case tea.KeyMsg:
-		return m.handleKey(msg)
 
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
@@ -44,12 +37,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case cursor.BlinkMsg:
 		return m.handleBlink(msg)
+
+	case resizePollMsg:
+		return m, tea.Batch(tea.RequestWindowSize, pollResize())
 	}
 	return m, nil
 }
 
 func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	if msg.Width < layout.MinWidth || msg.Height < layout.MinHeight {
+		return m, nil
+	}
+	if msg.Width == m.width && msg.Height == m.height {
 		return m, nil
 	}
 	m.width = msg.Width
@@ -60,6 +59,12 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		m.cleanup()
+		return m, tea.Quit
+	}
+
 	if m.showCommands {
 		switch msg.String() {
 		case "esc", "ctrl+p":
@@ -75,10 +80,6 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter":
 		return m.sendPrompt()
-
-	case "ctrl+c":
-		m.cleanup()
-		return m, tea.Quit
 
 	case "up", "k":
 		m.chatViewport.ScrollUp(1)

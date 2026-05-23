@@ -60,7 +60,19 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.showCommands {
+		switch msg.String() {
+		case "esc", "ctrl+p":
+			m.showCommands = false
+		}
+		return m, nil
+	}
+
 	switch msg.String() {
+	case "ctrl+p":
+		m.showCommands = true
+		return m, nil
+
 	case "enter":
 		return m.sendPrompt()
 

@@ -61,6 +61,9 @@ type Model struct {
 	mu            sync.Mutex
 
 	dirty bool
+
+	dragging      bool
+	needAutoScroll bool
 }
 
 func newChangeLog() *slog.Logger {
@@ -149,7 +152,9 @@ func (m *Model) refreshChat() {
 	m.chatViewport.SetContent(content)
 	t2 := time.Now()
 
-	m.chatViewport.GotoBottom()
+	if m.needAutoScroll {
+		m.chatViewport.GotoBottom()
+	}
 	renderMs := t1.Sub(t0).Milliseconds()
 	setMs := t2.Sub(t1).Milliseconds()
 	m.times = t2.Sub(t0).Milliseconds()

@@ -118,6 +118,32 @@ func renderScrollbar(height int, percent float64) string {
 	return sb.String()
 }
 
+func (m *Model) isScrollbarX(x int) bool {
+	scrollbarX := m.width - layout.PaddingHorizontal - 1
+	return x == scrollbarX
+}
+
+func (m *Model) isViewportY(y int) bool {
+	return y >= 0 && y < m.chatViewport.Height()
+}
+
+func (m *Model) setScrollFromY(y int) {
+	h := m.chatViewport.Height()
+	total := m.chatViewport.TotalLineCount()
+	maxScroll := total - h
+	if maxScroll <= 0 {
+		return
+	}
+	pct := float64(y) / float64(h)
+	if pct < 0 {
+		pct = 0
+	}
+	if pct > 1 {
+		pct = 1
+	}
+	m.chatViewport.SetYOffset(int(pct * float64(maxScroll)))
+}
+
 func (m *Model) renderStatus() string {
 	left := m.statusText
 	if m.loading {

@@ -2,8 +2,11 @@ package tui
 
 import (
 	"context"
+	"io"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -28,12 +31,13 @@ const (
 )
 
 type Model struct {
-	logger   *slog.Logger
-	inputCh  chan client.InputCommand
-	outputCh chan client.OutputEvent
-	cmd      *exec.Cmd
-	ctx      context.Context
-	cancel   context.CancelFunc
+	logger    *slog.Logger
+	changeLog *slog.Logger
+	inputCh   chan client.InputCommand
+	outputCh  chan client.OutputEvent
+	cmd       *exec.Cmd
+	ctx       context.Context
+	cancel    context.CancelFunc
 
 	width  int
 	height int
@@ -54,12 +58,29 @@ type Model struct {
 	mu            sync.Mutex
 }
 
+func newChangeLog() *slog.Logger {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	path := filepath.Join(home, ".gausszhou", "bubblecode", "logs", "change.log")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	return slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{Level: slog.LevelInfo}))
+}
+
 func NewModel(logger *slog.Logger, cmd *exec.Cmd, _ string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {
 	ta := newTextarea()
 	vp := viewport.New(viewport.WithWidth(layout.GetChatWidth(layout.InitWidth)), viewport.WithHeight(layout.InitHeight))
 
-	return &Model{
+	m := &Model{
 		logger:       logger,
+		changeLog:    newChangeLog(),
 		inputCh:      inputCh,
 		outputCh:     outputCh,
 		cmd:          cmd,
@@ -72,6 +93,8 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, _ string, ctx context.Context,
 		statusText:   "Ready",
 		spinner:      component.NewLoading(theme.LoadingSpinner()),
 	}
+	m.changeLog.Info("model created", "status", "ready")
+	return m
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -80,16 +103,25 @@ func (m *Model) Init() tea.Cmd {
 }
 
 func (m *Model) startEventCollector() {
+	m.changeLog.Info("event collector started")
 	for {
 		select {
 		case ev, ok := <-m.outputCh:
 			if !ok {
+				m.changeLog.Info("event collector: output channel closed")
 				return
 			}
 			m.mu.Lock()
 			m.pendingEvents = append(m.pendingEvents, ev)
+			n := len(m.pendingEvents)
 			m.mu.Unlock()
+			if ev.Update != nil {
+				m.changeLog.Info("event collected", "kind", "update", "pending", n)
+			} else {
+				m.changeLog.Info("event collected", "kind", ev.Kind, "pending", n)
+			}
 		case <-m.ctx.Done():
+			m.changeLog.Info("event collector: context cancelled")
 			return
 		}
 	}
@@ -100,6 +132,7 @@ func (m *Model) drainEvents() {
 	events := m.pendingEvents
 	m.pendingEvents = nil
 	m.mu.Unlock()
+	m.changeLog.Info("drain events", "count", len(events))
 	for _, ev := range events {
 		m.handleOutputEvent(ev)
 	}

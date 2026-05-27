@@ -112,6 +112,12 @@ func (m *Model) handleOutputEvent(ev client.OutputEvent) {
 	if ev.Update != nil {
 		m.processUpdate(ev.Update.Update)
 		m.refreshChat()
+		m.changeLog.Info("handle update",
+			"has_text", ev.Update.Update.AgentMessageChunk != nil,
+			"has_thought", ev.Update.Update.AgentThoughtChunk != nil,
+			"has_tool_call", ev.Update.Update.ToolCall != nil,
+			"has_plan", ev.Update.Update.Plan != nil,
+		)
 		return
 	}
 
@@ -121,10 +127,12 @@ func (m *Model) handleOutputEvent(ev client.OutputEvent) {
 		m.loading = false
 		m.statusText = "Ready"
 		m.refreshChat()
+		m.changeLog.Info("prompt done")
 	case "error":
 		m.promptRunning = false
 		m.loading = false
 		m.statusText = "Error: " + ev.Error.Error()
+		m.changeLog.Info("prompt error", "error", ev.Error.Error())
 	}
 }
 
@@ -204,6 +212,8 @@ func (m *Model) sendPrompt() (tea.Model, tea.Cmd) {
 	m.loading = true
 	m.statusText = "Processing..."
 	m.chatViewport.SetContent(m.renderMessages())
+
+	m.changeLog.Info("prompt sent", "text_length", len(text))
 
 	return m, tea.Batch(
 		sendInput(m.inputCh, client.InputCommand{Type: client.CmdPrompt, Text: text}),

@@ -16,6 +16,11 @@ import (
 
 func (m *Model) View() tea.View {
 	chat := m.chatViewport.View()
+	{
+		h := m.chatViewport.Height()
+		sb := renderScrollbar(h, m.chatViewport.ScrollPercent())
+		chat = lipgloss.JoinHorizontal(lipgloss.Top, chat, sb)
+	}
 	input := m.textarea.View()
 	status := m.renderStatus()
 
@@ -91,6 +96,28 @@ func comma(n int) string {
 	return string(buf)
 }
 
+func renderScrollbar(height int, percent float64) string {
+	thumb := int(percent * float64(height-1))
+	if thumb < 0 {
+		thumb = 0
+	}
+	if thumb >= height {
+		thumb = height - 1
+	}
+	var sb strings.Builder
+	for i := 0; i < height; i++ {
+		if i == thumb {
+			sb.WriteString(theme.ScrollbarThumb)
+		} else {
+			sb.WriteString(theme.ScrollbarTrack)
+		}
+		if i < height-1 {
+			sb.WriteString("\n")
+		}
+	}
+	return sb.String()
+}
+
 func (m *Model) renderStatus() string {
 	left := m.statusText
 	if m.loading {
@@ -98,7 +125,7 @@ func (m *Model) renderStatus() string {
 	} else {
 		left = "✓ " + left
 	}
-	right := fmt.Sprintf("%s chars", comma(m.chars))
+	right := fmt.Sprintf("%s chars  •  %d ms", comma(m.chars), m.times)
 	line := flex.New(flex.Row).
 		JustifyContent(flex.SpaceBetween).
 		Width(m.width - 2*layout.PaddingHorizontal).

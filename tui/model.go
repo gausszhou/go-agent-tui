@@ -48,6 +48,7 @@ type Model struct {
 	messages []component.Message
 
 	chars int
+	times int64
 
 	promptRunning bool
 	loading       bool
@@ -80,7 +81,7 @@ func newChangeLog() *slog.Logger {
 
 func NewModel(logger *slog.Logger, cmd *exec.Cmd, _ string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {
 	ta := newTextarea()
-	vp := viewport.New(viewport.WithWidth(layout.GetChatWidth(layout.InitWidth)), viewport.WithHeight(layout.InitHeight))
+	vp := viewport.New(viewport.WithWidth(layout.GetChatWidth(layout.InitWidth)-1), viewport.WithHeight(layout.InitHeight))
 
 	m := &Model{
 		logger:       logger,
@@ -147,12 +148,14 @@ func (m *Model) refreshChat() {
 	t1 := time.Now()
 	m.chatViewport.SetContent(content)
 	t2 := time.Now()
+
 	m.chatViewport.GotoBottom()
 	renderMs := t1.Sub(t0).Milliseconds()
 	setMs := t2.Sub(t1).Milliseconds()
+	m.times = t2.Sub(t0).Milliseconds()
 	chars := len(content)
 	m.chars = chars
-	if renderMs > 50 || setMs > 50 || chars > 100_0000 {
+	if m.times > 50 || chars > 100_0000 {
 		m.changeLog.Info("refresh chat",
 			"chars", chars,
 			"render_ms", renderMs,
@@ -162,7 +165,7 @@ func (m *Model) refreshChat() {
 }
 
 func (m *Model) updateSizes() {
-	m.chatViewport.SetWidth(layout.GetChatWidth(m.width))
+	m.chatViewport.SetWidth(layout.GetChatWidth(m.width) - 1)
 	m.chatViewport.SetHeight(layout.GetChatHeight(m.height))
 	m.textarea.SetWidth(layout.GetInputWidth(m.width))
 	m.textarea.SetHeight(layout.InputHeight)

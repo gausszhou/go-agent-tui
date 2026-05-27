@@ -3,8 +3,7 @@
 BINARY_NAME=bubblecode
 DIST_DIR=bin
 
-build:
-	CGO_ENABLED=0 go build -ldflags="-s -w" -o $(DIST_DIR)/$(BINARY_NAME) .
+build: build-all
 
 test:
 	go test ./...

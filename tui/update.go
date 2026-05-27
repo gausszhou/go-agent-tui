@@ -64,6 +64,9 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.height = msg.Height
 	m.updateSizes()
 	m.chatViewport.SetContent(m.renderMessages())
+	if m.chatViewport.AtBottom() {
+		m.needAutoScroll = true
+	}
 	return m, nil
 }
 
@@ -92,10 +95,14 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "up", "k":
 		m.chatViewport.ScrollUp(1)
+		m.needAutoScroll = false
 		return m, nil
 
 	case "down", "j":
 		m.chatViewport.ScrollDown(1)
+		if m.chatViewport.AtBottom() {
+			m.needAutoScroll = true
+		}
 		return m, nil
 	}
 
@@ -106,14 +113,41 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	t0 := time.Now()
-	if wheel, ok := msg.(tea.MouseWheelMsg); ok {
-		switch wheel.Button {
+
+	switch e := msg.(type) {
+	case tea.MouseWheelMsg:
+		switch e.Button {
 		case tea.MouseWheelUp:
 			m.chatViewport.ScrollUp(3)
+			m.needAutoScroll = false
 		case tea.MouseWheelDown:
 			m.chatViewport.ScrollDown(3)
+			if m.chatViewport.AtBottom() {
+				m.needAutoScroll = true
+			}
+		}
+
+	case tea.MouseClickMsg:
+		mouse := e.Mouse()
+		if mouse.Button == tea.MouseLeft && m.isScrollbarX(mouse.X) && m.isViewportY(mouse.Y) {
+			m.dragging = true
+			m.setScrollFromY(mouse.Y)
+			m.needAutoScroll = m.chatViewport.AtBottom()
+		}
+
+	case tea.MouseReleaseMsg:
+		m.dragging = false
+
+	case tea.MouseMotionMsg:
+		if m.dragging {
+			mouse := e.Mouse()
+			if m.isScrollbarX(mouse.X) && m.isViewportY(mouse.Y) {
+				m.setScrollFromY(mouse.Y)
+				m.needAutoScroll = m.chatViewport.AtBottom()
+			}
 		}
 	}
+
 	if d := time.Since(t0); d > 50*time.Millisecond {
 		m.changeLog.Info("handle mouse", "ms", d.Milliseconds())
 	}
@@ -232,6 +266,8 @@ func (m *Model) sendPrompt() (tea.Model, tea.Cmd) {
 	m.loading = true
 	m.statusText = "Processing..."
 	m.chatViewport.SetContent(m.renderMessages())
+	m.chatViewport.GotoBottom()
+	m.needAutoScroll = true
 
 	m.changeLog.Info("prompt sent", "text_length", len(text))
 

@@ -98,8 +98,8 @@ func RandomSplit(s string) []string {
 	var parts []string
 	for i := 0; i < len(runes); {
 		maxLen := len(runes) - i
-		if maxLen > 10 {
-			maxLen = 10
+		if maxLen > 100 {
+			maxLen = 100
 		}
 		l := rng.Intn(maxLen) + 1
 		parts = append(parts, string(runes[i:i+l]))

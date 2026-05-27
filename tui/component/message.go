@@ -29,7 +29,7 @@ func (m Message) Render(w int) string {
 		w = 80
 	}
 
-	content := m.Content
+	content := strings.TrimSpace(m.Content)
 	if m.Role == "agent" {
 		mdWidth := w - 3
 		if mdWidth < 10 {

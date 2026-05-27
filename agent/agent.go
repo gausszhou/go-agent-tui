@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
-	"strings"
 	"sync"
 	"time"
 
@@ -182,7 +181,14 @@ func (a *mockAgent) simulateTurn(ctx context.Context, sid acp.SessionId, prompt 
 
 		case "text":
 			content := examples[rand.Intn(len(examples))]
-			content = strings.Repeat(content, 100)
+			for len(content) < 100_000 {
+				remaining := 100_000 - len(content)
+				if len(content) <= remaining {
+					content += content
+				} else {
+					content += content[:remaining]
+				}
+			}
 			for _, char := range RandomSplit(content) {
 				time.Sleep(time.Duration(10+rand.Intn(30)) * time.Millisecond)
 				a.sendUpdate(ctx, sid, acp.SessionNotification{

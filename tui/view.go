@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
+	flex "github.com/gausszhou/bubbleflex"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -14,6 +16,11 @@ import (
 
 func (m *Model) View() tea.View {
 	chat := m.chatViewport.View()
+	{
+		h := m.chatViewport.Height()
+		sb := renderScrollbar(h, m.chatViewport.ScrollPercent())
+		chat = lipgloss.JoinHorizontal(lipgloss.Top, chat, sb)
+	}
 	input := m.textarea.View()
 	status := m.renderStatus()
 
@@ -70,6 +77,47 @@ func (m *Model) renderMessages() string {
 	return sb.String()
 }
 
+func comma(n int) string {
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	var buf []byte
+	for i, c := range s {
+		buf = append(buf, byte(c))
+		if c == '-' {
+			continue
+		}
+		fromRight := len(s) - i
+		if fromRight > 3 && fromRight%3 == 1 {
+			buf = append(buf, ',')
+		}
+	}
+	return string(buf)
+}
+
+func renderScrollbar(height int, percent float64) string {
+	thumb := int(percent * float64(height-1))
+	if thumb < 0 {
+		thumb = 0
+	}
+	if thumb >= height {
+		thumb = height - 1
+	}
+	var sb strings.Builder
+	for i := 0; i < height; i++ {
+		if i == thumb {
+			sb.WriteString(theme.ScrollbarThumb)
+		} else {
+			sb.WriteString(theme.ScrollbarTrack)
+		}
+		if i < height-1 {
+			sb.WriteString("\n")
+		}
+	}
+	return sb.String()
+}
+
 func (m *Model) renderStatus() string {
 	left := m.statusText
 	if m.loading {
@@ -77,5 +125,10 @@ func (m *Model) renderStatus() string {
 	} else {
 		left = "✓ " + left
 	}
-	return theme.StatusBar().Width(m.width - 2*layout.PaddingHorizontal).Render(left)
+	right := fmt.Sprintf("%s chars  •  %d ms", comma(m.chars), m.times)
+	line := flex.New(flex.Row).
+		JustifyContent(flex.SpaceBetween).
+		Width(m.width - 2*layout.PaddingHorizontal).
+		Join(left, right)
+	return theme.StatusBar().Width(m.width - 2*layout.PaddingHorizontal).Render(line)
 }

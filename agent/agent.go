@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -98,8 +99,8 @@ func RandomSplit(s string) []string {
 	var parts []string
 	for i := 0; i < len(runes); {
 		maxLen := len(runes) - i
-		if maxLen > 10 {
-			maxLen = 10
+		if maxLen > 100 {
+			maxLen = 100
 		}
 		l := rng.Intn(maxLen) + 1
 		parts = append(parts, string(runes[i:i+l]))
@@ -181,6 +182,7 @@ func (a *mockAgent) simulateTurn(ctx context.Context, sid acp.SessionId, prompt 
 
 		case "text":
 			content := examples[rand.Intn(len(examples))]
+			content = strings.Repeat(content, 100)
 			for _, char := range RandomSplit(content) {
 				time.Sleep(time.Duration(10+rand.Intn(30)) * time.Millisecond)
 				a.sendUpdate(ctx, sid, acp.SessionNotification{

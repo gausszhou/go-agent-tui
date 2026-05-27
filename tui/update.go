@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/cursor"
 	tea "charm.land/bubbletea/v2"
@@ -28,8 +29,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
 
-	case outputEventMsg:
-		return m.handleOutputEvent(msg.event)
+	case drainEventsMsg:
+		m.drainEvents()
+		return m, drainEventsCmd()
+
+	case renderMsg:
+		if m.dirty {
+			m.refreshChat()
+			m.dirty = false
+		}
+		return m, renderCmd()
 
 	case loadingTickMsg:
 		m.spinner = m.spinner.Tick()
@@ -96,6 +105,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	t0 := time.Now()
 	if wheel, ok := msg.(tea.MouseWheelMsg); ok {
 		switch wheel.Button {
 		case tea.MouseWheelUp:
@@ -104,14 +114,23 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.chatViewport.ScrollDown(3)
 		}
 	}
+	if d := time.Since(t0); d > 50*time.Millisecond {
+		m.changeLog.Info("handle mouse", "ms", d.Milliseconds())
+	}
 	return m, nil
 }
 
-func (m *Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
+func (m *Model) handleOutputEvent(ev client.OutputEvent) {
 	if ev.Update != nil {
 		m.processUpdate(ev.Update.Update)
-		m.refreshChat()
-		return m, waitForOutput(m.outputCh)
+		m.dirty = true
+		m.changeLog.Info("handle update",
+			"has_text", ev.Update.Update.AgentMessageChunk != nil,
+			"has_thought", ev.Update.Update.AgentThoughtChunk != nil,
+			"has_tool_call", ev.Update.Update.ToolCall != nil,
+			"has_plan", ev.Update.Update.Plan != nil,
+		)
+		return
 	}
 
 	switch ev.Kind {
@@ -119,13 +138,15 @@ func (m *Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
 		m.promptRunning = false
 		m.loading = false
 		m.statusText = "Ready"
-		m.refreshChat()
+		m.dirty = true
+		m.changeLog.Info("prompt done")
 	case "error":
 		m.promptRunning = false
 		m.loading = false
 		m.statusText = "Error: " + ev.Error.Error()
+		m.dirty = true
+		m.changeLog.Info("prompt error", "error", ev.Error.Error())
 	}
-	return m, nil
 }
 
 func (m *Model) handleBlink(msg cursor.BlinkMsg) (tea.Model, tea.Cmd) {
@@ -145,7 +166,9 @@ func (m *Model) processUpdate(update acp.SessionUpdate) {
 	case update.ToolCall != nil:
 		tc := update.ToolCall
 		inputJSON, _ := json.Marshal(tc.RawInput)
-		m.messages = append(m.messages, component.Message{Role: roleTool, Content: tc.Title + "\n" + string(inputJSON)})
+		content := tc.Title + "\n" + string(inputJSON)
+		m.messages = append(m.messages, component.Message{Role: roleTool, Content: content})
+		m.chars += len(content)
 
 	case update.ToolCallUpdate != nil:
 		tu := update.ToolCallUpdate
@@ -158,6 +181,7 @@ func (m *Model) processUpdate(update acp.SessionUpdate) {
 				if tu.RawOutput != nil {
 					if output := fmt.Sprintf("%v", tu.RawOutput); output != "" {
 						m.messages[i].Content += "\n" + output
+						m.chars += 1 + len(output) // \n + output
 					}
 				}
 				m.messages[i].Status = status
@@ -177,7 +201,9 @@ func (m *Model) processUpdate(update acp.SessionUpdate) {
 			}
 			lines = append(lines, fmt.Sprintf("[%s] %s", mark, e.Content))
 		}
-		m.messages = append(m.messages, component.Message{Role: rolePlan, Content: strings.Join(lines, "\n")})
+		content := strings.Join(lines, "\n")
+		m.messages = append(m.messages, component.Message{Role: rolePlan, Content: content})
+		m.chars += len(content)
 	}
 }
 
@@ -187,6 +213,7 @@ func (m *Model) appendOrNewMessage(role, content string) {
 	} else {
 		m.messages = append(m.messages, component.Message{Role: role, Content: content})
 	}
+	m.chars += len(content)
 }
 
 func (m *Model) sendPrompt() (tea.Model, tea.Cmd) {
@@ -200,14 +227,13 @@ func (m *Model) sendPrompt() (tea.Model, tea.Cmd) {
 
 	m.textarea.Reset()
 	m.messages = append(m.messages, component.Message{Role: roleUser, Content: text})
+	m.chars += len(text)
 	m.promptRunning = true
 	m.loading = true
 	m.statusText = "Processing..."
 	m.chatViewport.SetContent(m.renderMessages())
 
-	return m, tea.Batch(
-		sendInput(m.inputCh, client.InputCommand{Type: client.CmdPrompt, Text: text}),
-		waitForOutput(m.outputCh),
-		spinnerTick(),
-	)
+	m.changeLog.Info("prompt sent", "text_length", len(text))
+
+	return m, sendInput(m.inputCh, client.InputCommand{Type: client.CmdPrompt, Text: text})
 }

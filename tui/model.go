@@ -2,8 +2,12 @@ package tui
 
 import (
 	"context"
+	"io"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"sync"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -22,17 +26,18 @@ const (
 	roleUser    = "user"
 	roleAgent   = "agent"
 	roleThought = "thought"
-	roleTool  = "tool"
-	rolePlan  = "plan"
+	roleTool    = "tool"
+	rolePlan    = "plan"
 )
 
 type Model struct {
-	logger   *slog.Logger
-	inputCh  chan client.InputCommand
-	outputCh chan client.OutputEvent
-	cmd      *exec.Cmd
-	ctx      context.Context
-	cancel   context.CancelFunc
+	logger    *slog.Logger
+	changeLog *slog.Logger
+	inputCh   chan client.InputCommand
+	outputCh  chan client.OutputEvent
+	cmd       *exec.Cmd
+	ctx       context.Context
+	cancel    context.CancelFunc
 
 	width  int
 	height int
@@ -42,20 +47,45 @@ type Model struct {
 
 	messages []component.Message
 
+	chars int
+	times int64
+
 	promptRunning bool
 	loading       bool
 	statusText    string
 	spinner       component.Loading
 
 	showCommands bool
+
+	pendingEvents []client.OutputEvent
+	mu            sync.Mutex
+
+	dirty bool
+}
+
+func newChangeLog() *slog.Logger {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	path := filepath.Join(home, ".gausszhou", "bubblecode", "logs", "change.log")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	return slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{Level: slog.LevelInfo}))
 }
 
 func NewModel(logger *slog.Logger, cmd *exec.Cmd, _ string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {
 	ta := newTextarea()
-	vp := viewport.New(viewport.WithWidth(layout.GetChatWidth(layout.InitWidth)), viewport.WithHeight(layout.InitHeight))
+	vp := viewport.New(viewport.WithWidth(layout.GetChatWidth(layout.InitWidth)-1), viewport.WithHeight(layout.InitHeight))
 
-	return &Model{
+	m := &Model{
 		logger:       logger,
+		changeLog:    newChangeLog(),
 		inputCh:      inputCh,
 		outputCh:     outputCh,
 		cmd:          cmd,
@@ -68,19 +98,74 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, _ string, ctx context.Context,
 		statusText:   "Ready",
 		spinner:      component.NewLoading(theme.LoadingSpinner()),
 	}
+	m.changeLog.Info("model created", "status", "ready")
+	return m
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(waitForOutput(m.outputCh), textarea.Blink, spinnerTick(), pollResize())
+	go m.startEventCollector()
+	return tea.Batch(textarea.Blink, spinnerTick(), pollResize(), drainEventsCmd(), renderCmd())
+}
+
+func (m *Model) startEventCollector() {
+	m.changeLog.Info("event collector started")
+	for {
+		select {
+		case ev, ok := <-m.outputCh:
+			if !ok {
+				m.changeLog.Info("event collector: output channel closed")
+				return
+			}
+			m.mu.Lock()
+			m.pendingEvents = append(m.pendingEvents, ev)
+			n := len(m.pendingEvents)
+			m.mu.Unlock()
+			if ev.Update != nil {
+				m.changeLog.Info("event collected", "kind", "update", "pending", n)
+			} else {
+				m.changeLog.Info("event collected", "kind", ev.Kind, "pending", n)
+			}
+		case <-m.ctx.Done():
+			m.changeLog.Info("event collector: context cancelled")
+			return
+		}
+	}
+}
+
+func (m *Model) drainEvents() {
+	m.mu.Lock()
+	events := m.pendingEvents
+	m.pendingEvents = nil
+	m.mu.Unlock()
+	for _, ev := range events {
+		m.handleOutputEvent(ev)
+	}
 }
 
 func (m *Model) refreshChat() {
-	m.chatViewport.SetContent(m.renderMessages())
+	t0 := time.Now()
+	content := m.renderMessages()
+	t1 := time.Now()
+	m.chatViewport.SetContent(content)
+	t2 := time.Now()
+
 	m.chatViewport.GotoBottom()
+	renderMs := t1.Sub(t0).Milliseconds()
+	setMs := t2.Sub(t1).Milliseconds()
+	m.times = t2.Sub(t0).Milliseconds()
+	chars := len(content)
+	m.chars = chars
+	if m.times > 50 || chars > 100_0000 {
+		m.changeLog.Info("refresh chat",
+			"chars", chars,
+			"render_ms", renderMs,
+			"set_ms", setMs,
+		)
+	}
 }
 
 func (m *Model) updateSizes() {
-	m.chatViewport.SetWidth(layout.GetChatWidth(m.width))
+	m.chatViewport.SetWidth(layout.GetChatWidth(m.width) - 1)
 	m.chatViewport.SetHeight(layout.GetChatHeight(m.height))
 	m.textarea.SetWidth(layout.GetInputWidth(m.width))
 	m.textarea.SetHeight(layout.InputHeight)
@@ -112,15 +197,11 @@ func newTextarea() textarea.Model {
 	return ta
 }
 
-type outputEventMsg struct {
-	event client.OutputEvent
-}
+type drainEventsMsg struct{}
 
-type channelClosedMsg struct{}
+type renderMsg struct{}
 
 type loadingTickMsg struct{}
-
-type inputSentMsg struct{}
 
 type resizePollMsg struct{}
 
@@ -130,21 +211,23 @@ func pollResize() tea.Cmd {
 	})
 }
 
+func drainEventsCmd() tea.Cmd {
+	return tea.Tick(16*time.Millisecond, func(t time.Time) tea.Msg {
+		return drainEventsMsg{}
+	})
+}
+
 func sendInput(ch chan client.InputCommand, cmd client.InputCommand) tea.Cmd {
 	return func() tea.Msg {
 		ch <- cmd
-		return inputSentMsg{}
+		return nil
 	}
 }
 
-func waitForOutput(ch chan client.OutputEvent) tea.Cmd {
-	return func() tea.Msg {
-		ev, ok := <-ch
-		if !ok {
-			return channelClosedMsg{}
-		}
-		return outputEventMsg{event: ev}
-	}
+func renderCmd() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return renderMsg{}
+	})
 }
 
 func spinnerTick() tea.Cmd {

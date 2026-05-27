@@ -121,4 +121,7 @@ var (
 	SessionNormalStyle    = lipgloss.NewStyle().Foreground(ThemeMuted)
 	SessionSelectStyle    = lipgloss.NewStyle().Foreground(ThemeText).Background(ThemeAccent).Padding(0, 1)
 	SessionEmptyStyle     = lipgloss.NewStyle().Foreground(ThemeDim).PaddingLeft(2)
+
+	ScrollbarThumb = lipgloss.NewStyle().Foreground(ThemeDim).Render("▓")
+	ScrollbarTrack = lipgloss.NewStyle().Foreground(ThemeSurface).Render("░")
 )

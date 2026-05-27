@@ -26,8 +26,8 @@ const (
 	roleUser    = "user"
 	roleAgent   = "agent"
 	roleThought = "thought"
-	roleTool  = "tool"
-	rolePlan  = "plan"
+	roleTool    = "tool"
+	rolePlan    = "plan"
 )
 
 type Model struct {
@@ -56,6 +56,8 @@ type Model struct {
 
 	pendingEvents []client.OutputEvent
 	mu            sync.Mutex
+
+	dirty bool
 }
 
 func newChangeLog() *slog.Logger {
@@ -99,7 +101,7 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, _ string, ctx context.Context,
 
 func (m *Model) Init() tea.Cmd {
 	go m.startEventCollector()
-	return tea.Batch(textarea.Blink, spinnerTick(), pollResize(), drainEventsCmd())
+	return tea.Batch(textarea.Blink, spinnerTick(), pollResize(), drainEventsCmd(), renderCmd())
 }
 
 func (m *Model) startEventCollector() {
@@ -144,10 +146,16 @@ func (m *Model) refreshChat() {
 	m.chatViewport.SetContent(content)
 	t2 := time.Now()
 	m.chatViewport.GotoBottom()
-	m.changeLog.Info("refresh chat",
-		"render_ms", t1.Sub(t0).Seconds()*1000,
-		"set_ms", t2.Sub(t1).Seconds()*1000,
-	)
+	renderMs := t1.Sub(t0).Milliseconds()
+	setMs := t2.Sub(t1).Milliseconds()
+	chars := len(content)
+	if renderMs > 50 || setMs > 50 || chars > 100_0000 {
+		m.changeLog.Info("refresh chat",
+			"chars", chars,
+			"render_ms", renderMs,
+			"set_ms", setMs,
+		)
+	}
 }
 
 func (m *Model) updateSizes() {
@@ -185,6 +193,8 @@ func newTextarea() textarea.Model {
 
 type drainEventsMsg struct{}
 
+type renderMsg struct{}
+
 type loadingTickMsg struct{}
 
 type resizePollMsg struct{}
@@ -206,6 +216,12 @@ func sendInput(ch chan client.InputCommand, cmd client.InputCommand) tea.Cmd {
 		ch <- cmd
 		return nil
 	}
+}
+
+func renderCmd() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return renderMsg{}
+	})
 }
 
 func spinnerTick() tea.Cmd {

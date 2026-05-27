@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/cursor"
 	tea "charm.land/bubbletea/v2"
@@ -31,6 +32,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case drainEventsMsg:
 		m.drainEvents()
 		return m, drainEventsCmd()
+
+	case renderMsg:
+		if m.dirty {
+			m.refreshChat()
+			m.dirty = false
+		}
+		return m, renderCmd()
 
 	case loadingTickMsg:
 		m.spinner = m.spinner.Tick()
@@ -97,6 +105,7 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	t0 := time.Now()
 	if wheel, ok := msg.(tea.MouseWheelMsg); ok {
 		switch wheel.Button {
 		case tea.MouseWheelUp:
@@ -105,13 +114,16 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.chatViewport.ScrollDown(3)
 		}
 	}
+	if d := time.Since(t0); d > 50*time.Millisecond {
+		m.changeLog.Info("handle mouse", "ms", d.Milliseconds())
+	}
 	return m, nil
 }
 
 func (m *Model) handleOutputEvent(ev client.OutputEvent) {
 	if ev.Update != nil {
 		m.processUpdate(ev.Update.Update)
-		m.refreshChat()
+		m.dirty = true
 		m.changeLog.Info("handle update",
 			"has_text", ev.Update.Update.AgentMessageChunk != nil,
 			"has_thought", ev.Update.Update.AgentThoughtChunk != nil,
@@ -126,12 +138,13 @@ func (m *Model) handleOutputEvent(ev client.OutputEvent) {
 		m.promptRunning = false
 		m.loading = false
 		m.statusText = "Ready"
-		m.refreshChat()
+		m.dirty = true
 		m.changeLog.Info("prompt done")
 	case "error":
 		m.promptRunning = false
 		m.loading = false
 		m.statusText = "Error: " + ev.Error.Error()
+		m.dirty = true
 		m.changeLog.Info("prompt error", "error", ev.Error.Error())
 	}
 }
@@ -215,8 +228,5 @@ func (m *Model) sendPrompt() (tea.Model, tea.Cmd) {
 
 	m.changeLog.Info("prompt sent", "text_length", len(text))
 
-	return m, tea.Batch(
-		sendInput(m.inputCh, client.InputCommand{Type: client.CmdPrompt, Text: text}),
-		spinnerTick(),
-	)
+	return m, sendInput(m.inputCh, client.InputCommand{Type: client.CmdPrompt, Text: text})
 }

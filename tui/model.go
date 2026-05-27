@@ -132,7 +132,6 @@ func (m *Model) drainEvents() {
 	events := m.pendingEvents
 	m.pendingEvents = nil
 	m.mu.Unlock()
-	m.changeLog.Info("drain events", "count", len(events))
 	for _, ev := range events {
 		m.handleOutputEvent(ev)
 	}

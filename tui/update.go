@@ -166,7 +166,9 @@ func (m *Model) processUpdate(update acp.SessionUpdate) {
 	case update.ToolCall != nil:
 		tc := update.ToolCall
 		inputJSON, _ := json.Marshal(tc.RawInput)
-		m.messages = append(m.messages, component.Message{Role: roleTool, Content: tc.Title + "\n" + string(inputJSON)})
+		content := tc.Title + "\n" + string(inputJSON)
+		m.messages = append(m.messages, component.Message{Role: roleTool, Content: content})
+		m.chars += len(content)
 
 	case update.ToolCallUpdate != nil:
 		tu := update.ToolCallUpdate
@@ -179,6 +181,7 @@ func (m *Model) processUpdate(update acp.SessionUpdate) {
 				if tu.RawOutput != nil {
 					if output := fmt.Sprintf("%v", tu.RawOutput); output != "" {
 						m.messages[i].Content += "\n" + output
+						m.chars += 1 + len(output) // \n + output
 					}
 				}
 				m.messages[i].Status = status
@@ -198,7 +201,9 @@ func (m *Model) processUpdate(update acp.SessionUpdate) {
 			}
 			lines = append(lines, fmt.Sprintf("[%s] %s", mark, e.Content))
 		}
-		m.messages = append(m.messages, component.Message{Role: rolePlan, Content: strings.Join(lines, "\n")})
+		content := strings.Join(lines, "\n")
+		m.messages = append(m.messages, component.Message{Role: rolePlan, Content: content})
+		m.chars += len(content)
 	}
 }
 
@@ -208,6 +213,7 @@ func (m *Model) appendOrNewMessage(role, content string) {
 	} else {
 		m.messages = append(m.messages, component.Message{Role: role, Content: content})
 	}
+	m.chars += len(content)
 }
 
 func (m *Model) sendPrompt() (tea.Model, tea.Cmd) {
@@ -221,6 +227,7 @@ func (m *Model) sendPrompt() (tea.Model, tea.Cmd) {
 
 	m.textarea.Reset()
 	m.messages = append(m.messages, component.Message{Role: roleUser, Content: text})
+	m.chars += len(text)
 	m.promptRunning = true
 	m.loading = true
 	m.statusText = "Processing..."

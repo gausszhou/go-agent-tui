@@ -6,6 +6,8 @@ charm.land/glamour/v2 v2.0.0 h1:IDBoqLEy7Hdpb9VOXN+khLP/XSxtJy1VsHuW/yF87+U=
 charm.land/glamour/v2 v2.0.0/go.mod h1:kjq9WB0s8vuUYZNYey2jp4Lgd9f4cKdzAw88FZtpj/w=
 charm.land/lipgloss/v2 v2.0.0 h1:sd8N/B3x892oiOjFfBQdXBQp3cAkvjGaU5TvVZC3ivo=
 charm.land/lipgloss/v2 v2.0.0/go.mod h1:w6SnmsBFBmEFBodiEDurGS/sdUY/u1+v72DqUzc6J14=
+charm.land/lipgloss/v2 v2.0.3 h1:yM2zJ4Cf5Y51b7RHIwioil4ApI/aypFXXVHSwlM6RzU=
+charm.land/lipgloss/v2 v2.0.3/go.mod h1:7myLU9iG/3xluAWzpY/fSxYYHCgoKTie7laxk6ATwXA=
 github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ4pzQ=
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
 github.com/alecthomas/assert/v2 v2.11.0 h1:2Q9r3ki8+JYXvGsDyBXwH3LcJ+WK5D0gc5E8vS6K3D0=
@@ -47,6 +49,8 @@ github.com/coder/acp-go-sdk v0.12.0/go.mod h1:yKzM/3R9uELp4+nBAwwtkS0aN1FOFjo11C
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/dlclark/regexp2 v1.11.5 h1:Q/sSnsKerHeCkc/jSTNq1oCm7KiVgUMZRDUoRu0JQZQ=
 github.com/dlclark/regexp2 v1.11.5/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
+github.com/gausszhou/bubbleflex v0.0.2 h1:aOi4Ykw1haelIL2SidoM+nVBiyHjXS4aMYDB5ahvfYs=
+github.com/gausszhou/bubbleflex v0.0.2/go.mod h1:bAnA53OXejge13JVFUQ+ya/XFD7M8iO+2Vi26mCCscQ=
 github.com/gausszhou/gruff v0.0.2 h1:yuTt6i0Vp83FQe7fcrwqx/h1QmvFzZDaJ59LaO8f1pQ=
 github.com/gausszhou/gruff v0.0.2/go.mod h1:A13SZnBBuZyXLEqTW2WCZ0dByAOSREabmvUFDI7tUec=
 github.com/gorilla/css v1.0.1 h1:ntNaBIghp6JmvWnxbZKANoLyuXTPZ4cAMlo6RyhlbO8=

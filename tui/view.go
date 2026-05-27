@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
+	flex "github.com/gausszhou/bubbleflex"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -70,6 +72,25 @@ func (m *Model) renderMessages() string {
 	return sb.String()
 }
 
+func comma(n int) string {
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	var buf []byte
+	for i, c := range s {
+		buf = append(buf, byte(c))
+		if c == '-' {
+			continue
+		}
+		fromRight := len(s) - i
+		if fromRight > 3 && fromRight%3 == 1 {
+			buf = append(buf, ',')
+		}
+	}
+	return string(buf)
+}
+
 func (m *Model) renderStatus() string {
 	left := m.statusText
 	if m.loading {
@@ -77,5 +98,10 @@ func (m *Model) renderStatus() string {
 	} else {
 		left = "✓ " + left
 	}
-	return theme.StatusBar().Width(m.width - 2*layout.PaddingHorizontal).Render(left)
+	right := fmt.Sprintf("%s chars", comma(m.chars))
+	line := flex.New(flex.Row).
+		JustifyContent(flex.SpaceBetween).
+		Width(m.width - 2*layout.PaddingHorizontal).
+		Join(left, right)
+	return theme.StatusBar().Width(m.width - 2*layout.PaddingHorizontal).Render(line)
 }

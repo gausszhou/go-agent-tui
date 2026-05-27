@@ -47,6 +47,8 @@ type Model struct {
 
 	messages []component.Message
 
+	chars int
+
 	promptRunning bool
 	loading       bool
 	statusText    string
@@ -149,6 +151,7 @@ func (m *Model) refreshChat() {
 	renderMs := t1.Sub(t0).Milliseconds()
 	setMs := t2.Sub(t1).Milliseconds()
 	chars := len(content)
+	m.chars = chars
 	if renderMs > 50 || setMs > 50 || chars > 100_0000 {
 		m.changeLog.Info("refresh chat",
 			"chars", chars,

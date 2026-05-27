@@ -139,8 +139,16 @@ func (m *Model) drainEvents() {
 }
 
 func (m *Model) refreshChat() {
-	m.chatViewport.SetContent(m.renderMessages())
+	t0 := time.Now()
+	content := m.renderMessages()
+	t1 := time.Now()
+	m.chatViewport.SetContent(content)
+	t2 := time.Now()
 	m.chatViewport.GotoBottom()
+	m.changeLog.Info("refresh chat",
+		"render_ms", t1.Sub(t0).Seconds()*1000,
+		"set_ms", t2.Sub(t1).Seconds()*1000,
+	)
 }
 
 func (m *Model) updateSizes() {

@@ -28,8 +28,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
 
-	case outputEventMsg:
-		return m.handleOutputEvent(msg.event)
+	case drainEventsMsg:
+		m.drainEvents()
+		return m, drainEventsCmd()
 
 	case loadingTickMsg:
 		m.spinner = m.spinner.Tick()
@@ -107,11 +108,11 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
+func (m *Model) handleOutputEvent(ev client.OutputEvent) {
 	if ev.Update != nil {
 		m.processUpdate(ev.Update.Update)
 		m.refreshChat()
-		return m, waitForOutput(m.outputCh)
+		return
 	}
 
 	switch ev.Kind {
@@ -125,7 +126,6 @@ func (m *Model) handleOutputEvent(ev client.OutputEvent) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.statusText = "Error: " + ev.Error.Error()
 	}
-	return m, nil
 }
 
 func (m *Model) handleBlink(msg cursor.BlinkMsg) (tea.Model, tea.Cmd) {
@@ -207,7 +207,6 @@ func (m *Model) sendPrompt() (tea.Model, tea.Cmd) {
 
 	return m, tea.Batch(
 		sendInput(m.inputCh, client.InputCommand{Type: client.CmdPrompt, Text: text}),
-		waitForOutput(m.outputCh),
 		spinnerTick(),
 	)
 }

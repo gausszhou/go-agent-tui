@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os/exec"
+	"sync"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -48,6 +49,9 @@ type Model struct {
 	spinner       component.Loading
 
 	showCommands bool
+
+	pendingEvents []client.OutputEvent
+	mu            sync.Mutex
 }
 
 func NewModel(logger *slog.Logger, cmd *exec.Cmd, _ string, ctx context.Context, cancel context.CancelFunc, inputCh chan client.InputCommand, outputCh chan client.OutputEvent) *Model {
@@ -71,7 +75,34 @@ func NewModel(logger *slog.Logger, cmd *exec.Cmd, _ string, ctx context.Context,
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(waitForOutput(m.outputCh), textarea.Blink, spinnerTick(), pollResize())
+	go m.startEventCollector()
+	return tea.Batch(textarea.Blink, spinnerTick(), pollResize(), drainEventsCmd())
+}
+
+func (m *Model) startEventCollector() {
+	for {
+		select {
+		case ev, ok := <-m.outputCh:
+			if !ok {
+				return
+			}
+			m.mu.Lock()
+			m.pendingEvents = append(m.pendingEvents, ev)
+			m.mu.Unlock()
+		case <-m.ctx.Done():
+			return
+		}
+	}
+}
+
+func (m *Model) drainEvents() {
+	m.mu.Lock()
+	events := m.pendingEvents
+	m.pendingEvents = nil
+	m.mu.Unlock()
+	for _, ev := range events {
+		m.handleOutputEvent(ev)
+	}
 }
 
 func (m *Model) refreshChat() {
@@ -112,15 +143,9 @@ func newTextarea() textarea.Model {
 	return ta
 }
 
-type outputEventMsg struct {
-	event client.OutputEvent
-}
-
-type channelClosedMsg struct{}
+type drainEventsMsg struct{}
 
 type loadingTickMsg struct{}
-
-type inputSentMsg struct{}
 
 type resizePollMsg struct{}
 
@@ -130,20 +155,16 @@ func pollResize() tea.Cmd {
 	})
 }
 
+func drainEventsCmd() tea.Cmd {
+	return tea.Tick(16*time.Millisecond, func(t time.Time) tea.Msg {
+		return drainEventsMsg{}
+	})
+}
+
 func sendInput(ch chan client.InputCommand, cmd client.InputCommand) tea.Cmd {
 	return func() tea.Msg {
 		ch <- cmd
-		return inputSentMsg{}
-	}
-}
-
-func waitForOutput(ch chan client.OutputEvent) tea.Cmd {
-	return func() tea.Msg {
-		ev, ok := <-ch
-		if !ok {
-			return channelClosedMsg{}
-		}
-		return outputEventMsg{event: ev}
+		return nil
 	}
 }
 

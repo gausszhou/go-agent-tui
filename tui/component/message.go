@@ -35,7 +35,7 @@ func (m Message) Render(w int) string {
 		if mdWidth < 10 {
 			mdWidth = 10
 		}
-		content = RenderMarkdown(content, mdWidth, "")
+		return RenderMarkdown(content, mdWidth, "")
 	}
 
 	var (

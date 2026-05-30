@@ -1,7 +1,7 @@
 package component
 
 import (
-	"github.com/gausszhou/gruff"
+	"github.com/gausszhou/gruff/gruff"
 )
 
 func RenderMarkdown(content string, width int, _ string) string {

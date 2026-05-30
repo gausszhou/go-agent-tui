@@ -47,6 +47,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case cursor.BlinkMsg:
 		return m.handleBlink(msg)
 
+	case tea.PasteMsg:
+		m.textarea.Update(msg)
+		return m, nil
+
 	case resizePollMsg:
 		return m, tea.Batch(tea.RequestWindowSize, pollResize())
 	}
@@ -133,18 +137,53 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.dragging = true
 			m.setScrollFromY(mouse.Y)
 			m.needAutoScroll = m.chatViewport.AtBottom()
+		} else if mouse.Button == tea.MouseLeft && m.isViewportY(mouse.Y) && mouse.X < m.chatViewport.Width() {
+			m.selecting = true
+			contentLine := m.chatViewport.YOffset() + mouse.Y
+			m.selection = &Selection{
+				StartLine: contentLine,
+				StartCol:  mouse.X,
+				EndLine:   contentLine,
+				EndCol:    mouse.X,
+			}
+			m.dirty = true
 		}
 
 	case tea.MouseReleaseMsg:
+		if m.selecting && m.selection != nil {
+			text := m.getSelectedText()
+			m.copyToClipboard(text)
+			m.selecting = false
+			m.selection = nil
+			m.dirty = true
+		}
 		m.dragging = false
 
 	case tea.MouseMotionMsg:
+		mouse := e.Mouse()
 		if m.dragging {
-			mouse := e.Mouse()
 			if m.isScrollbarX(mouse.X) && m.isViewportY(mouse.Y) {
 				m.setScrollFromY(mouse.Y)
 				m.needAutoScroll = m.chatViewport.AtBottom()
 			}
+		}
+		if m.selecting && m.selection != nil {
+			if mouse.X < 0 {
+				mouse.X = 0
+			}
+			if mouse.X >= m.chatViewport.Width() {
+				mouse.X = m.chatViewport.Width() - 1
+			}
+			y := mouse.Y
+			if y < 0 {
+				y = 0
+			}
+			if y >= m.chatViewport.Height() {
+				y = m.chatViewport.Height() - 1
+			}
+			m.selection.EndLine = m.chatViewport.YOffset() + y
+			m.selection.EndCol = mouse.X
+			m.dirty = true
 		}
 	}
 
@@ -155,6 +194,9 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleOutputEvent(ev client.OutputEvent) {
+	m.selecting = false
+	m.selection = nil
+
 	if ev.Update != nil {
 		m.processUpdate(ev.Update.Update)
 		m.dirty = true
@@ -259,6 +301,8 @@ func (m *Model) sendPrompt() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	m.selecting = false
+	m.selection = nil
 	m.textarea.Reset()
 	m.messages = append(m.messages, component.Message{Role: roleUser, Content: text})
 	m.chars += len(text)

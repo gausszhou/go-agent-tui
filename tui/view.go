@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	flex "github.com/gausszhou/bubbleflex"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	flex "github.com/gausszhou/bubbleflex"
 
 	"github.com/gausszhou/bubblecode/tui/component"
 	"github.com/gausszhou/bubblecode/tui/layout"
@@ -74,7 +74,11 @@ func (m *Model) renderMessages() string {
 		}
 		sb.WriteString(msg.Render(w))
 	}
-	return sb.String()
+	content := sb.String()
+	if m.selecting {
+		content = m.applySelectionHighlight(content)
+	}
+	return content
 }
 
 func comma(n int) string {
@@ -154,7 +158,7 @@ func (m *Model) renderStatus() string {
 	right := fmt.Sprintf("%s chars  •  %d ms", comma(m.chars), m.times)
 	line := flex.New(flex.Row).
 		JustifyContent(flex.SpaceBetween).
-		Width(m.width - 2*layout.PaddingHorizontal).
+		Width(m.width-2*layout.PaddingHorizontal).
 		Join(left, right)
 	return theme.StatusBar().Width(m.width - 2*layout.PaddingHorizontal).Render(line)
 }
